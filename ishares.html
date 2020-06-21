@@ -370,20 +370,22 @@ summary {
 
 
 <div id="basic-idea" class="section level1">
-<h1>Basic idea</h1>
+<h1>1. Basic idea</h1>
 <p>The basic idea of this script is download information on ETFs that are part of the iShares family, published by Blackrock. Blackrock provides basic information on for each ETF on the respective fund’s website. The aim of this code is to:</p>
 <ul>
 <li>Download and extract data for a number of ETFs</li>
-<li>Convert to Euro returns and save data</li>
-<li>Summarize the data</li>
+<li>Aggregate data and convert to Euro returns</li>
+<li>Analyze historic ETF performance</li>
 </ul>
 <p>The code uses the following <code>R</code> packages:</p>
-<pre class="r"><code>library(progress)
+<pre class="r"><code>library(knitr)
+library(lubridate)
+library(progress)
 library(tidyverse)
 library(xml2)</code></pre>
 </div>
 <div id="download-and-extract-data" class="section level1">
-<h1>Download and extract data</h1>
+<h1>2. Download and extract data</h1>
 <p>Blackrock shows detailed information on its various iShares ETFs on the ETF’s website (e.g. <a href="https://www.ishares.com/de/privatanleger/de/produkte/251726/ishares-euro-corporate-bond-ucits-etf/">iShares Core € Corp Bond UCITS ETF</a>). For each ETF, Blackrock provides an Excel file for download covering fundamental information, historic prices, positions, and dividends. I limit the analysis to <a href="https://www.ishares.com/de/privatanleger/de/anlegen/bestseller">iShare’s most popular standard and ESG ETFs</a>. A list of ETF names and URLs to the respective Excel file is the basis for the analysis:</p>
 <pre><code>## # A tibble: 6 x 2
 ##   name                   url                                                    
@@ -394,8 +396,8 @@ library(xml2)</code></pre>
 ## 4 iShares-Core-DAX       https://www.ishares.com/de/privatanleger/de/produkte/2~
 ## 5 Dow-Jones-US-Select-D~ https://www.ishares.com/de/privatanleger/de/produkte/2~
 ## 6 iShares-Core-FTSE-100  https://www.ishares.com/de/privatanleger/de/produkte/2~</code></pre>
-<div id="get-xml-data" class="section level2">
-<h2>Get XML data</h2>
+<div id="a-get-xml-data" class="section level2">
+<h2>2.a Get XML data</h2>
 <p>The Excel files provided by iShares are not “real” Excel files but are instead XML files created in Excel. The first step is therefore to download the XML file from iShares, fix some encoding issues in the first line for for the character <em>&amp;</em>.</p>
 <pre class="r"><code>get_xml &lt;- function(etf_url) {
   file_raw &lt;- tempfile()
@@ -418,8 +420,8 @@ library(xml2)</code></pre>
 ## [5] &lt;ss:Worksheet ss:Name=&quot;Wertentwicklung&quot;&gt;\n  &lt;ss:Table&gt;\n    &lt;ss:Row&gt;\n    ...
 ## [6] &lt;ss:Worksheet ss:Name=&quot;Aussch&amp;#xC3;&amp;#xBC;ttungen&quot;&gt;\n  &lt;ss:Table&gt;\n    &lt;ss ...</code></pre>
 </div>
-<div id="extract-sheet-overview" class="section level2">
-<h2>Extract sheet “Overview”</h2>
+<div id="b-extract-sheet-overview" class="section level2">
+<h2>2.b Extract sheet “Overview”</h2>
 <p>The XML node #2 contains the sheet “Overview”. The following function loops through all cells of the Excel sheet and extracts the overview information.</p>
 <pre class="r"><code>extract_overview &lt;- function(data_xml) {
   xml_overview &lt;- data_xml %&gt;%
@@ -468,8 +470,8 @@ library(xml2)</code></pre>
 ## 10 Product Structure         Physical          
 ## # ... with 27 more rows</code></pre>
 </div>
-<div id="extract-sheet-historic" class="section level2">
-<h2>Extract sheet “Historic”</h2>
+<div id="c-extract-sheet-historic" class="section level2">
+<h2>2.c Extract sheet “Historic”</h2>
 <p>The XML node #4 contains the sheet “Historic”. The following function loops through all cells of the Excel sheet and extracts information on historic prices. Since looping through 7 columns * &gt; 1000 rows is time consuming, the function checks whether this information has alredy been extracted previously. It compares the number of rows of the output file <code>[etf_name]_price.tsv</code> to the downloaded file and extracts only the rows not contained in the output file.</p>
 <pre class="r"><code>extract_historic &lt;- function(data_xml, file_price){
   xml_price &lt;- data_xml %&gt;%
@@ -512,7 +514,7 @@ library(xml2)</code></pre>
   return(out)
 }</code></pre>
 <p>The output from the <code>extract_price</code> function is a tibble with three columns containing historic ETF information (date, currency, price ~ NAV):</p>
-<pre><code>## # A tibble: 21 x 3
+<pre><code>## # A tibble: 12 x 3
 ##    date        currency price  
 ##    &lt;chr&gt;       &lt;chr&gt;    &lt;chr&gt;  
 ##  1 19.Jun.2020 EUR      16.1201
@@ -525,10 +527,11 @@ library(xml2)</code></pre>
 ##  8 10.Jun.2020 EUR      16.3873
 ##  9 09.Jun.2020 EUR      16.5336
 ## 10 08.Jun.2020 EUR      16.8603
-## # ... with 11 more rows</code></pre>
+## 11 05.Jun.2020 EUR      16.7734
+## 12 04.Jun.2020 EUR      16.1843</code></pre>
 </div>
-<div id="extract-sheet-dividends" class="section level2">
-<h2>Extract sheet “Dividends”</h2>
+<div id="d-extract-sheet-dividends" class="section level2">
+<h2>2.d Extract sheet “Dividends”</h2>
 <p>The XML node #6 (if included in the XML file) contains the sheet “Dividends”. The following function loops through all cells of the Excel sheet and extracts information on dividends. Like for the sheet “Historic”, looping through all cells can be time consuming. Again, the function checks whether this information has alredy been extracted previously and compares the number of rows of the output file <code>[etf_name]_dividends.tsv</code> to the downloaded file and extracts only the rows not contained in the output file.</p>
 <pre class="r"><code>extract_dividends &lt;- function(data_xml, file_dividends){
   if (xml_length(data_xml) == 6) {
@@ -586,15 +589,15 @@ library(xml2)</code></pre>
 ## 10 02.JÃ¤n.2018 0       
 ## # ... with 24 more rows</code></pre>
 </div>
-<div id="clean-download-data" class="section level2">
-<h2>Clean download data</h2>
+<div id="e-clean-download-data" class="section level2">
+<h2>2.e Clean download data</h2>
 <p>The next step after the download is to clean the data. The data cleaning basically consists of changing some special characters and converting character columns to numeric and date. The results are saved as:</p>
 <ul>
 <li><code>[etf_name]_overview.tsv</code></li>
 <li><code>[etf_name]_prices.tsv</code></li>
 <li><code>[etf_name]_dividends.tsv</code></li>
 </ul>
-<pre class="r"><code>clean_overview &lt;- function(data_overview) {
+<pre class="r"><code>clean_overview &lt;- function(data_overview, file_overview) {
   data_overview &lt;- data_overview %&gt;%
     mutate(parameter = str_replace_all(parameter, &quot;\u00C3\u00a4&quot;, &quot;\u00e4&quot;))%&gt;%
     mutate(parameter = str_replace_all(parameter, &quot;\u00C3\u00b6&quot;, &quot;\u00f6&quot;))%&gt;%
@@ -616,7 +619,7 @@ clean_price &lt;- function(data_price, file_price) {
     mutate(price = as.numeric(price))
   
   if (file.exists(file_price)) {
-    data_price &lt;- bind_rows(data_price, old_price) %&gt;%
+    data_price &lt;- bind_rows(data_price, read_tsv(file_price)) %&gt;%
       unique() %&gt;%
       group_by(date) %&gt;%
       filter(row_number() == 1) %&gt;%
@@ -647,8 +650,8 @@ clean_dividends &lt;- function(data_xml, data_dividends, file_dividends) {
   write_tsv(data_dividends, file_dividends)
 }</code></pre>
 </div>
-<div id="complete-function-for-ishares-download" class="section level2">
-<h2>Complete function for ishares download</h2>
+<div id="f-complete-function-for-ishares-download" class="section level2">
+<h2>2.f Complete function for ishares download</h2>
 <p>The complete function to download the ETF data from iShares:</p>
 <pre class="r"><code>download_ishares &lt;- function(etf_name, etf_url) {
   file_overview &lt;- file.path(dir_price, str_c(etf_name, &quot;_overview.tsv&quot;))
@@ -665,7 +668,7 @@ clean_dividends &lt;- function(data_xml, data_dividends, file_dividends) {
   clean_dividends(data_xml, data_dividends, file_dividends)
 }</code></pre>
 <p>Map the <code>download_ishares</code> function to the list of ETF names and URLs <code>[data_etf]</code>:</p>
-<pre class="r"><code>map2(data_etf$name, data_etf$url, ishares_scrap_fun)</code></pre>
+<pre class="r"><code>map2(data_etf$name, data_etf$url, download_ishares)</code></pre>
 <p>The output are three files for each ETF that contain cleaned overview data, historic prices, and dividends:</p>
 <pre><code>## # A tibble: 37 x 2
 ##    parameter               value             
@@ -681,20 +684,20 @@ clean_dividends &lt;- function(data_xml, data_dividends, file_dividends) {
 ##  9 Methodik                Replikation       
 ## 10 Product Structure       Physical          
 ## # ... with 27 more rows</code></pre>
-<pre><code>## # A tibble: 3,844 x 3
+<pre><code>## # A tibble: 3,853 x 3
 ##    date       currency price
 ##    &lt;date&gt;     &lt;chr&gt;    &lt;dbl&gt;
-##  1 2020-06-17 EUR       16.1
-##  2 2020-06-16 EUR       16.0
-##  3 2020-06-15 EUR       15.6
-##  4 2020-06-12 EUR       15.6
-##  5 2020-06-11 EUR       15.6
-##  6 2020-06-10 EUR       16.4
-##  7 2020-06-09 EUR       16.5
-##  8 2020-06-08 EUR       16.9
-##  9 2020-06-05 EUR       16.8
-## 10 2020-06-04 EUR       16.2
-## # ... with 3,834 more rows</code></pre>
+##  1 2020-06-19 EUR       16.1
+##  2 2020-06-18 EUR       16.1
+##  3 2020-06-17 EUR       16.1
+##  4 2020-06-16 EUR       16.0
+##  5 2020-06-15 EUR       15.6
+##  6 2020-06-12 EUR       15.6
+##  7 2020-06-11 EUR       15.6
+##  8 2020-06-10 EUR       16.4
+##  9 2020-06-09 EUR       16.5
+## 10 2020-06-08 EUR       16.9
+## # ... with 3,843 more rows</code></pre>
 <pre><code>## # A tibble: 18 x 2
 ##    date       dividend
 ##    &lt;date&gt;        &lt;dbl&gt;
@@ -718,11 +721,314 @@ clean_dividends &lt;- function(data_xml, data_dividends, file_dividends) {
 ## 18 NA           0.0344</code></pre>
 </div>
 </div>
-<div id="convert-to-euro-returns-and-save-data" class="section level1">
-<h1>Convert to Euro returns and save data</h1>
+<div id="aggregate-data-and-convert-to-euro-returns" class="section level1">
+<h1>3. Aggregate data and convert to Euro returns</h1>
+<p>The iShares ETFs use three different currencies: US Dollar, British Pound, and Euro. Therefore, I convert prices and dividends to Euro in order to compre the ETFs.</p>
+<div id="a-get-exchange-rates" class="section level2">
+<h2>3.a Get exchange rates</h2>
+<p>For the comparison, I download exchange rates provided by the <a href="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html">ECB</a>. The ECB offers a ZIP file containing various monthly Euro exchnage rates for download.</p>
+<pre class="r"><code>file_zip &lt;- tempfile()
+download.file(&quot;https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip&quot;, file_zip)
+data_fx &lt;- read_csv(unz(file_zip, &quot;eurofxref-hist.csv&quot;)) %&gt;%
+  select(date = Date, usd_rate = USD, gbp_rate = GBP)</code></pre>
 </div>
-<div id="summarize-the-data" class="section level1">
-<h1>Summarize the data</h1>
+<div id="b-aggregate-data-and-convert-to-euro-returns" class="section level2">
+<h2>3.b Aggregate data and convert to Euro returns</h2>
+<p>I loop through the list of ETF names and URLs <code>[data_etf]</code> and load the individual ETF files extracted and saved in section II. To account for dividends, I add the dividend payout to the ETF price ~ net asset value, assuming that all dividend payout was reinvested. Dividend payouts are reduced by a capital gains tax rate of 27.5%.</p>
+<pre class="r"><code>ishares_data &lt;- map(data_etf$name, ~{
+
+  # load files
+  overview &lt;- read_tsv(file.path(dir_overview, str_c(.x, &quot;_overview.tsv&quot;)))
+  price &lt;- read_tsv(file.path(dir_price, str_c(.x, &quot;_price.tsv&quot;)))
+  dividends &lt;- read_tsv(file.path(dir_dividends, str_c(.x, &quot;_dividends.tsv&quot;)))
+  
+  # get metadata
+  name &lt;- .x
+  isin &lt;- overview$value[overview$parameter == &quot;ISIN&quot;]
+  
+  # combine data
+  out &lt;- tibble(name, isin) %&gt;%
+    mutate(id = TRUE) %&gt;%
+    left_join(mutate(price, id = TRUE), by = &quot;id&quot;) %&gt;%
+    select(-id)
+  
+  # dividends
+  if(dim(dividends)[1] &gt; 0) {
+    out &lt;- out %&gt;%
+      left_join(dividends, by = &quot;date&quot;) %&gt;%
+      mutate(dividend = coalesce(dividend * 0.725, 0)) %&gt;%
+      mutate(dividend = cumsum(dividend))
+  } else {
+    out$dividend &lt;- 0
+  }
+  
+  out &lt;- out %&gt;%
+    mutate(price = price + dividend) %&gt;%
+    select(-dividend)
+  
+  return(out)
+}) %&gt;% bind_rows() %&gt;%
+  filter(!is.na(date))</code></pre>
+<p>The code above results in a table with five columns (name, isin, date, currency, price) containing the aggregated data for all ETFs:</p>
+<pre><code>## # A tibble: 95,208 x 5
+##    name   isin         date       currency price
+##    &lt;chr&gt;  &lt;chr&gt;        &lt;date&gt;     &lt;chr&gt;    &lt;dbl&gt;
+##  1 DivDAX DE0002635273 2020-06-19 EUR       16.1
+##  2 DivDAX DE0002635273 2020-06-18 EUR       16.1
+##  3 DivDAX DE0002635273 2020-06-17 EUR       16.1
+##  4 DivDAX DE0002635273 2020-06-16 EUR       16.0
+##  5 DivDAX DE0002635273 2020-06-15 EUR       15.6
+##  6 DivDAX DE0002635273 2020-06-12 EUR       15.6
+##  7 DivDAX DE0002635273 2020-06-11 EUR       15.6
+##  8 DivDAX DE0002635273 2020-06-10 EUR       16.4
+##  9 DivDAX DE0002635273 2020-06-09 EUR       16.5
+## 10 DivDAX DE0002635273 2020-06-08 EUR       16.9
+## # ... with 95,198 more rows</code></pre>
+<p>Next, I convert all ETF prices that are not Euro denomminated to Euro using the exchange rates downloaded from the ECB.</p>
+<pre class="r"><code>ishares_data &lt;- ishares_data %&gt;%
+  left_join(data_fx, by = &quot;date&quot;) %&gt;%
+  mutate(price = case_when(currency == &quot;USD&quot; ~ price / usd_rate,
+                           currency == &quot;GBP&quot; ~ price / gbp_rate,
+                           TRUE ~ price)) %&gt;%
+  select(-currency, -usd_rate, -gbp_rate)</code></pre>
+<p>The result is a long-formatted dataframe of Euro-denomminated ETF prices for various dates:</p>
+<pre><code>## # A tibble: 95,208 x 4
+##    name   isin         date       price
+##    &lt;chr&gt;  &lt;chr&gt;        &lt;date&gt;     &lt;dbl&gt;
+##  1 DivDAX DE0002635273 2020-06-19  16.1
+##  2 DivDAX DE0002635273 2020-06-18  16.1
+##  3 DivDAX DE0002635273 2020-06-17  16.1
+##  4 DivDAX DE0002635273 2020-06-16  16.0
+##  5 DivDAX DE0002635273 2020-06-15  15.6
+##  6 DivDAX DE0002635273 2020-06-12  15.6
+##  7 DivDAX DE0002635273 2020-06-11  15.6
+##  8 DivDAX DE0002635273 2020-06-10  16.4
+##  9 DivDAX DE0002635273 2020-06-09  16.5
+## 10 DivDAX DE0002635273 2020-06-08  16.9
+## # ... with 95,198 more rows</code></pre>
+</div>
+</div>
+<div id="analyze-historic-etf-performance" class="section level1">
+<h1>4. Analyze historic ETF performance</h1>
+<p>For a comparison of the ETFs, I analyze their historic performance, using trailling monthly returns. I rely on the following key metrics:</p>
+<ul>
+<li>Average returns</li>
+<li>Variance of returns</li>
+<li>Sharpe ratio</li>
+<li>Share of months with positive returns</li>
+</ul>
+<div id="a-compute-trailling-monthly-returns" class="section level2">
+<h2>4.a Compute trailling monthly returns</h2>
+<p>The first step is to map the ETF price data to a list of all possible dates and to categorize these dates into 28 groups. Each group is one of 28 possible monthly return series. Adding all 28 groups, gives a set of trailing monthly returns for each ETF.</p>
+<pre class="r"><code>dates &lt;- tibble(date = seq(from = min(ishares_data$date), to = max(ishares_data$date), by = 1))
+dates$i &lt;- rep(1:28, ceiling(nrow(dates) / 28))[seq(nrow(dates))]
+
+data_returns &lt;- map(unique(ishares_data$name), ~{
+  xprices &lt;- ishares_data %&gt;%
+    filter(name == .x) %&gt;%
+    right_join(dates, by = &quot;date&quot;) %&gt;%
+    fill(name) %&gt;%
+    filter(!is.na(name))
+  
+  xreturns &lt;- map(1:28, ~{
+    out &lt;- xprices %&gt;%
+      filter(i == .x) %&gt;%
+      mutate(start_px = lag(price)) %&gt;%
+      mutate(diff_px = price - start_px) %&gt;%
+      mutate(return = diff_px / start_px) %&gt;%
+      select(name, date, return)
+    return(out)
+  }) %&gt;%
+    bind_rows() %&gt;%
+    arrange(date) %&gt;%
+    filter(!is.na(return))
+  return(xreturns)
+}) %&gt;%   bind_rows()</code></pre>
+<pre><code>## # A tibble: 91,505 x 3
+##    name   date         return
+##    &lt;chr&gt;  &lt;date&gt;        &lt;dbl&gt;
+##  1 DivDAX 2005-05-02 -0.0127 
+##  2 DivDAX 2005-05-03 -0.0201 
+##  3 DivDAX 2005-05-04 -0.0213 
+##  4 DivDAX 2005-05-05 -0.0158 
+##  5 DivDAX 2005-05-06 -0.0173 
+##  6 DivDAX 2005-05-09 -0.0163 
+##  7 DivDAX 2005-05-10 -0.0201 
+##  8 DivDAX 2005-05-11 -0.0179 
+##  9 DivDAX 2005-05-12 -0.0192 
+## 10 DivDAX 2005-05-13 -0.00950
+## # ... with 91,495 more rows</code></pre>
+</div>
+<div id="b-compute-key-metrics" class="section level2">
+<h2>4.b Compute key metrics</h2>
+<p><strong>Average returns, variance, &amp; Sharpe ratio</strong></p>
+<pre class="r"><code>data_returns %&gt;%
+  group_by(name) %&gt;%
+  summarise(risk = var(return),
+            returns = mean(return)) %&gt;%
+  mutate(sharpe = (returns / risk) * sqrt(365 / 28)) %&gt;%
+  mutate(risk = risk * sqrt(365 / 28) * 100,
+        returns = returns * (365 / 28) * 100) %&gt;%
+  arrange(desc(sharpe)) %&gt;%
+  select(Name = name, Return = returns, Risk = risk, Sharpe = sharpe) %&gt;%
+  slice(1:10) %&gt;%
+  kable(digits = 2)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Name</th>
+<th align="right">Return</th>
+<th align="right">Risk</th>
+<th align="right">Sharpe</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">iShares-Core-Global-Aggregate-Bond</td>
+<td align="right">3.44</td>
+<td align="right">0.07</td>
+<td align="right">49.51</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Core-Govt-Bond</td>
+<td align="right">1.20</td>
+<td align="right">0.05</td>
+<td align="right">22.58</td>
+</tr>
+<tr class="odd">
+<td align="left">iShares-Core-SP-500</td>
+<td align="right">13.85</td>
+<td align="right">0.73</td>
+<td align="right">18.87</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Core-MSCI-World</td>
+<td align="right">11.19</td>
+<td align="right">0.66</td>
+<td align="right">16.98</td>
+</tr>
+<tr class="odd">
+<td align="left">iShares-MSCI-ACWI</td>
+<td align="right">10.91</td>
+<td align="right">0.66</td>
+<td align="right">16.59</td>
+</tr>
+<tr class="even">
+<td align="left">NASDAQ</td>
+<td align="right">12.99</td>
+<td align="right">0.90</td>
+<td align="right">14.45</td>
+</tr>
+<tr class="odd">
+<td align="left">iShares-Dow-Jones-Global-Sustainability</td>
+<td align="right">8.77</td>
+<td align="right">0.68</td>
+<td align="right">12.86</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Core-Corp-Bond</td>
+<td align="right">0.56</td>
+<td align="right">0.05</td>
+<td align="right">10.90</td>
+</tr>
+<tr class="odd">
+<td align="left">iShares-Core-MSCI-Japan</td>
+<td align="right">8.20</td>
+<td align="right">0.78</td>
+<td align="right">10.58</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Physical-Gold</td>
+<td align="right">5.13</td>
+<td align="right">0.60</td>
+<td align="right">8.57</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Share of months with positive returns</strong></p>
+<pre class="r"><code>data_returns %&gt;%
+  mutate(return = return &gt; 0) %&gt;%
+  group_by(name) %&gt;%
+  summarise(week_pos = sum(return),
+            week_tot = n()) %&gt;%
+  mutate(share_pos = week_pos / week_tot * 100) %&gt;%
+  arrange(desc(share_pos)) %&gt;%
+  select(Name = name, Share_Positives = share_pos, Weeks_Positive = week_pos, Weeks_Total = week_tot) %&gt;%
+  slice(1:10) %&gt;%
+  kable(digits = 2)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Name</th>
+<th align="right">Share_Positives</th>
+<th align="right">Weeks_Positive</th>
+<th align="right">Weeks_Total</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">iShares-MSCI-ACWI</td>
+<td align="right">63.38</td>
+<td align="right">1329</td>
+<td align="right">2097</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Core-SP-500</td>
+<td align="right">63.28</td>
+<td align="right">1551</td>
+<td align="right">2451</td>
+</tr>
+<tr class="odd">
+<td align="left">iShares-Core-MSCI-World</td>
+<td align="right">62.68</td>
+<td align="right">1646</td>
+<td align="right">2626</td>
+</tr>
+<tr class="even">
+<td align="left">MDAX</td>
+<td align="right">62.49</td>
+<td align="right">2935</td>
+<td align="right">4697</td>
+</tr>
+<tr class="odd">
+<td align="left">NASDAQ</td>
+<td align="right">62.48</td>
+<td align="right">2155</td>
+<td align="right">3449</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Core-Global-Aggregate-Bond</td>
+<td align="right">62.01</td>
+<td align="right">364</td>
+<td align="right">587</td>
+</tr>
+<tr class="odd">
+<td align="left">iShares-Dow-Jones-Global-Sustainability</td>
+<td align="right">61.38</td>
+<td align="right">1389</td>
+<td align="right">2263</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Core-MSCI-Pacific-ex-Japan</td>
+<td align="right">60.72</td>
+<td align="right">1546</td>
+<td align="right">2546</td>
+</tr>
+<tr class="odd">
+<td align="left">TecDax</td>
+<td align="right">59.70</td>
+<td align="right">2807</td>
+<td align="right">4702</td>
+</tr>
+<tr class="even">
+<td align="left">iShares-Core-MSCI-EM</td>
+<td align="right">59.60</td>
+<td align="right">866</td>
+<td align="right">1453</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 
 

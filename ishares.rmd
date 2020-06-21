@@ -11,35 +11,37 @@ dir_overview <- file.path(dir_ishares, "ishares_overview")
 dir_price <- file.path(dir_ishares, "ishares_price")
 dir_dividends <- file.path(dir_ishares, "ishares_dividends")
 
-lst_urls <- readr::read_tsv(file.path(dir_ishares, "data_ishares_url.tsv"))
+data_etf <- readr::read_tsv(file.path(dir_ishares, "data_ishares_url.tsv"))
 ```
 
-# Basic idea
+# 1. Basic idea
 
 The basic idea of this script is download information on ETFs that are part of the iShares family, published by Blackrock. Blackrock provides basic information on for each ETF on the respective fund's website. The aim of this code is to:
 
 - Download and extract data for a number of ETFs
-- Convert to Euro returns and save data
-- Summarize the data
+- Aggregate data and convert to Euro returns
+- Analyze historic ETF performance
 
 The code uses the following `R` packages:
 
 ```{r, echo = TRUE, results = "hide", warning = FALSE, message = FALSE}
+library(knitr)
+library(lubridate)
 library(progress)
 library(tidyverse)
 library(xml2)
 ```
 
 
-# Download and extract data
+# 2. Download and extract data
 
 Blackrock shows detailed information on its various iShares ETFs on the ETF's website (e.g. [iShares Core € Corp Bond UCITS ETF](https://www.ishares.com/de/privatanleger/de/produkte/251726/ishares-euro-corporate-bond-ucits-etf/)). For each ETF, Blackrock provides an Excel file for download covering fundamental information, historic prices, positions, and dividends. I limit the analysis to [iShare's most popular standard and ESG ETFs](https://www.ishares.com/de/privatanleger/de/anlegen/bestseller). A list of ETF names and URLs to the respective Excel file is the basis for the analysis:
 
 ```{r, echo = FALSE}
-head(lst_urls)
+head(data_etf)
 ```
 
-## Get XML data
+## 2.a Get XML data
 
 The Excel files provided by iShares are not "real" Excel files but are instead XML files created in Excel. The first step is therefore to download the XML file from iShares, fix some encoding issues in the first line for for the character *&*.
 
@@ -60,11 +62,11 @@ get_xml <- function(etf_url) {
 The output from the `get_xml` function is an XML file with 6 nodes:
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE}
-data_xml <- get_xml(lst_urls$url[1])
+data_xml <- get_xml(data_etf$url[1])
 data_xml
 ```
 
-## Extract sheet "Overview"
+## 2.b Extract sheet "Overview"
 
 The XML node #2 contains the sheet "Overview". The following function loops through all cells of the Excel sheet and extracts the overview information.
 
@@ -109,7 +111,7 @@ The output from the `extract_overview` function is a tibble with two columns con
 extract_overview(data_xml)
 ```
 
-## Extract sheet "Historic"
+## 2.c Extract sheet "Historic"
 
 The XML node #4 contains the sheet "Historic". The following function loops through all cells of the Excel sheet and extracts information on historic prices. Since looping through 7 columns * > 1000 rows is time consuming, the function checks whether this information has alredy been extracted previously. It compares the number of rows of the output file `[etf_name]_price.tsv` to the downloaded file and extracts only the rows not contained in the output file.
 
@@ -159,10 +161,10 @@ extract_historic <- function(data_xml, file_price){
 The output from the `extract_price` function is a tibble with three columns containing historic ETF information (date, currency, price ~ NAV):
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE}
-extract_historic(data_xml, file.path(dir_price, str_c(lst_urls$name[1], "_price.tsv")))
+extract_historic(data_xml, file.path(dir_price, str_c(data_etf$name[1], "_price.tsv")))
 ```
 
-## Extract sheet "Dividends"
+## 2.d Extract sheet "Dividends"
 
 The XML node #6 (if included in the XML file) contains the sheet "Dividends". The following function loops through all cells of the Excel sheet and extracts information on dividends. Like for the sheet "Historic", looping through all cells can be time consuming. Again, the function checks whether this information has alredy been extracted previously and compares the number of rows of the output file `[etf_name]_dividends.tsv` to the downloaded file and extracts only the rows not contained in the output file.
 
@@ -212,10 +214,10 @@ extract_dividends <- function(data_xml, file_dividends){
 The output from the `extract_dividends` function is a tibble with two columns containing ETF dividends (date, dividend):
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE}
-extract_dividends(data_xml, file.path(dir_dividends, str_c(lst_urls$name[1], "_dividends.tsv")))
+extract_dividends(data_xml, file.path(dir_dividends, str_c(data_etf$name[1], "_dividends.tsv")))
 ```
 
-## Clean download data
+## 2.e Clean download data
 
 The next step after the download is to clean the data. The data cleaning basically consists of changing some special characters and converting character columns to numeric and date. The results are saved as:
 
@@ -224,7 +226,7 @@ The next step after the download is to clean the data. The data cleaning basical
 - `[etf_name]_dividends.tsv`
 
 ```{r}
-clean_overview <- function(data_overview) {
+clean_overview <- function(data_overview, file_overview) {
   data_overview <- data_overview %>%
     mutate(parameter = str_replace_all(parameter, "\u00C3\u00a4", "\u00e4"))%>%
     mutate(parameter = str_replace_all(parameter, "\u00C3\u00b6", "\u00f6"))%>%
@@ -246,7 +248,7 @@ clean_price <- function(data_price, file_price) {
     mutate(price = as.numeric(price))
   
   if (file.exists(file_price)) {
-    data_price <- bind_rows(data_price, old_price) %>%
+    data_price <- bind_rows(data_price, read_tsv(file_price)) %>%
       unique() %>%
       group_by(date) %>%
       filter(row_number() == 1) %>%
@@ -278,7 +280,7 @@ clean_dividends <- function(data_xml, data_dividends, file_dividends) {
 }
 ```
 
-## Complete function for ishares download
+## 2.f Complete function for ishares download
 
 The complete function to download the ETF data from iShares:
 
@@ -302,7 +304,7 @@ download_ishares <- function(etf_name, etf_url) {
 Map the `download_ishares` function to the list of ETF names and URLs `[data_etf]`:
 
 ```{r, echo = TRUE, eval = FALSE}
-map2(data_etf$name, data_etf$url, ishares_scrap_fun)
+map2(data_etf$name, data_etf$url, download_ishares)
 ```
 
 The output are three files for each ETF that contain cleaned overview data, historic prices, and dividends:
@@ -319,7 +321,161 @@ read_tsv(file.path(dir_price, "DivDax_price.tsv"))
 read_tsv(file.path(dir_dividends, "DivDax_dividends.tsv"))
 ```
 
-# Convert to Euro returns and save data
+# 3. Aggregate data and convert to Euro returns
 
-# Summarize the data
+The iShares ETFs use three different currencies: US Dollar, British Pound, and Euro. Therefore, I convert prices and dividends to Euro in order to compre the ETFs.
+
+## 3.a Get exchange rates
+
+For the comparison, I download exchange rates provided by the [ECB](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html). The ECB offers a ZIP file containing various monthly Euro exchnage rates for download.
+
+```{r, echo = TRUE, results = "hide", warning = FALSE, message = FALSE}
+file_zip <- tempfile()
+download.file("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip", file_zip)
+data_fx <- read_csv(unz(file_zip, "eurofxref-hist.csv")) %>%
+  select(date = Date, usd_rate = USD, gbp_rate = GBP)
+```
+
+## 3.b Aggregate data and convert to Euro returns
+
+I loop through the list of ETF names and URLs `[data_etf]` and load the individual ETF files extracted and saved in section II. To account for dividends, I add the dividend payout to the ETF price ~ net asset value, assuming that all dividend payout was reinvested. Dividend payouts are reduced by a capital gains tax rate of 27.5%.
+
+```{r, echo = TRUE, warning = FALSE, message = FALSE}
+ishares_data <- map(data_etf$name, ~{
+
+  # load files
+  overview <- read_tsv(file.path(dir_overview, str_c(.x, "_overview.tsv")))
+  price <- read_tsv(file.path(dir_price, str_c(.x, "_price.tsv")))
+  dividends <- read_tsv(file.path(dir_dividends, str_c(.x, "_dividends.tsv")))
+  
+  # get metadata
+  name <- .x
+  isin <- overview$value[overview$parameter == "ISIN"]
+  
+  # combine data
+  out <- tibble(name, isin) %>%
+    mutate(id = TRUE) %>%
+    left_join(mutate(price, id = TRUE), by = "id") %>%
+    select(-id)
+  
+  # dividends
+  if(dim(dividends)[1] > 0) {
+    out <- out %>%
+      left_join(dividends, by = "date") %>%
+      mutate(dividend = coalesce(dividend * 0.725, 0)) %>%
+      mutate(dividend = cumsum(dividend))
+  } else {
+    out$dividend <- 0
+  }
+  
+  out <- out %>%
+    mutate(price = price + dividend) %>%
+    select(-dividend)
+  
+  return(out)
+}) %>% bind_rows() %>%
+  filter(!is.na(date))
+```
+
+The code above results in a table with five columns (name, isin, date, currency, price) containing the aggregated data for all ETFs:
+
+```{r, echo = FALSE}
+ishares_data
+```
+
+Next, I convert all ETF prices that are not Euro denomminated to Euro using the exchange rates downloaded from the ECB.
+
+```{r, echo = TRUE, warning = FALSE, message = FALSE}
+ishares_data <- ishares_data %>%
+  left_join(data_fx, by = "date") %>%
+  mutate(price = case_when(currency == "USD" ~ price / usd_rate,
+                           currency == "GBP" ~ price / gbp_rate,
+                           TRUE ~ price)) %>%
+  select(-currency, -usd_rate, -gbp_rate)
+```
+
+The result is a long-formatted dataframe of Euro-denomminated ETF prices for various dates:
+
+```{r, echo = FALSE}
+ishares_data
+```
+
+
+# 4. Analyze historic ETF performance
+
+For a comparison of the ETFs, I analyze their historic performance, using trailling monthly returns. I rely on the following key metrics:
+
+- Average returns
+- Variance of returns
+- Sharpe ratio
+- Share of months with positive returns
+
+## 4.a Compute trailling monthly returns
+
+The first step is to map the ETF price data to a list of all possible dates and to categorize these dates into 28 groups. Each group is one of 28 possible monthly return series. Adding all 28 groups, gives a set of trailing monthly returns for each ETF.
+
+```{r, echo = TRUE, results = "hide"}
+dates <- tibble(date = seq(from = min(ishares_data$date), to = max(ishares_data$date), by = 1))
+dates$i <- rep(1:28, ceiling(nrow(dates) / 28))[seq(nrow(dates))]
+
+data_returns <- map(unique(ishares_data$name), ~{
+  xprices <- ishares_data %>%
+    filter(name == .x) %>%
+    right_join(dates, by = "date") %>%
+    fill(name) %>%
+    filter(!is.na(name))
+  
+  xreturns <- map(1:28, ~{
+    out <- xprices %>%
+      filter(i == .x) %>%
+      mutate(start_px = lag(price)) %>%
+      mutate(diff_px = price - start_px) %>%
+      mutate(return = diff_px / start_px) %>%
+      select(name, date, return)
+    return(out)
+  }) %>%
+    bind_rows() %>%
+    arrange(date) %>%
+    filter(!is.na(return))
+  return(xreturns)
+}) %>%   bind_rows()
+```
+
+```{r, echo = FALSE}
+data_returns
+```
+
+
+## 4.b Compute key metrics
+
+**Average returns, variance, & Sharpe ratio**
+
+```{r}
+data_returns %>%
+  group_by(name) %>%
+  summarise(risk = var(return),
+            returns = mean(return)) %>%
+  mutate(sharpe = (returns / risk) * sqrt(365 / 28)) %>%
+  mutate(risk = risk * sqrt(365 / 28) * 100,
+        returns = returns * (365 / 28) * 100) %>%
+  arrange(desc(sharpe)) %>%
+  select(Name = name, Return = returns, Risk = risk, Sharpe = sharpe) %>%
+  slice(1:10) %>%
+  kable(digits = 2)
+```
+
+**Share of months with positive returns**
+
+```{r}
+data_returns %>%
+  mutate(return = return > 0) %>%
+  group_by(name) %>%
+  summarise(week_pos = sum(return),
+            week_tot = n()) %>%
+  mutate(share_pos = week_pos / week_tot * 100) %>%
+  arrange(desc(share_pos)) %>%
+  select(Name = name, Share_Positives = share_pos, Weeks_Positive = week_pos, Weeks_Total = week_tot) %>%
+  slice(1:10) %>%
+  kable(digits = 2)
+```
 
