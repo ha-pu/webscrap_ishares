@@ -7,7 +7,7 @@ clean_dividends <- function(data_xml, data_dividends, file_dividends) {
     filter(!is.na(dividend) & dividend != 0)
   
   if (xml_length(data_xml) == 6 & file.exists(file_dividends)) {
-    data_dividends <- bind_rows(data_dividends, old_dividends) %>%
+	data_dividends <- bind_rows(data_dividends, read_tsv(file_dividends)) %>%
       unique() %>%
       group_by(date) %>%
       filter(row_number() == 1) %>%
