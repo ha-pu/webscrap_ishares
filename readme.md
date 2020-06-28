@@ -721,6 +721,48 @@ data_returns %>%
 | DE0005933972 | TecDax                                  |            59.70 |            2807 |         4702 |
 | IE00BKM4GZ66 | iShares-Core-MSCI-EM                    |            59.60 |             866 |         1453 |
 
+**Plot ETF returns**
+
+``` r
+ishares_data %>%
+  filter(isin %in% c("IE00B3F81409", "IE00B4L5Y983") & year(date) >= 2018) %>%
+  select(Name = name, Date = date, Price = price) %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = Price, colour = Name)) +
+  facet_wrap(~ Name, scales = "free_y") +
+  guides(colour = FALSE) +
+  labs(title = "Development of ETF prices", x = NULL)
+```
+
+![](plot_price.png)<!-- -->
+
+``` r
+data_returns %>%
+  filter(isin %in% c("IE00B3F81409", "IE00B4L5Y983") & year(date) >= 2018) %>%
+  select(Name = name, Date = date, Return = return) %>%
+  ggplot() +
+  geom_line(aes(x = Date, y = Return, colour = Name)) +
+  geom_hline(aes(yintercept = 0), colour = "darkblue") +
+  facet_wrap(~ Name) +
+  guides(colour = FALSE) +
+  labs(title = "Development of weekly returns", x = NULL)
+```
+
+![](plot_returns_dev.png)<!-- -->
+
+``` r
+data_returns %>%
+  filter(isin %in% c("IE00B3F81409", "IE00B4L5Y983") & year(date) >= 2018) %>%
+  select(Name = name, Return = return) %>%
+  ggplot() +
+  geom_boxplot(aes(x = Name, y = Return, fill = Name)) +
+  geom_hline(aes(yintercept = 0), colour = "darkblue") +
+  guides(fill = FALSE) +
+  labs(title = "Distribution of weekly returns", x = NULL)
+```
+
+![](plot_returns_dist.png)<!-- -->
+
 These results allow the selection of the best performing iShares ETF for
 investment or can be used for further portfolio analysis.
 
