@@ -11,7 +11,7 @@ iShares
     - [2.d Extract sheet “Dividends”](#2d-extract-sheet-dividends)
     - [2.e Clean download data](#2e-clean-download-data)
     - [2.f Complete function for ishares download](#2f-complete-function-for-ishares-download)
-  - [3\. Aggregate data and convert to Euro returns](#3-aggreate-data-and-convert-to-euro-returns)
+  - [3\. Aggregate data and convert to Euro returns](#3-aggregate-data-and-convert-to-euro-returns)
     - [3.a Get exchange rates](#3a-get-exchange-rates)
     - [3.b Aggregate data and convert to Euro returns](#3b-aggregate-data-and-convert-to-euro-returns)
   - [4\. Analyze historic ETF performance](#4-analyze-historic-etf-performance)
