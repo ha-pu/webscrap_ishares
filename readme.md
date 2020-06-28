@@ -1,6 +1,23 @@
 iShares
 ================
 
+# Table of contents
+
+  - 1\. Basic idea
+  - 2\. Download and extract data
+    - 2.a Get XML data
+    - 2.b Extract sheet “Overview”
+    - 2.c Extract sheet “Historic”
+    - 2.d Extract sheet “Dividends”
+    - 2.e Clean download data
+    - 2.f Complete function for ishares download
+  - 3\. Aggregate data and convert to Euro returns
+    - 3.a Get exchange rates
+    - 3.b Aggregate data and convert to Euro returns
+  - 4\. Analyze historic ETF performance
+    - 4.a Compute trailling monthly returns
+    - 4.b Compute key metrics
+
 # 1\. Basic idea
 
 The basic idea of this script is download information on ETFs that are
