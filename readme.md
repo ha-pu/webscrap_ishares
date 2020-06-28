@@ -20,6 +20,8 @@ iShares
 
 # 1\. Basic idea
 
+[Get to Top](#table-of-contents)
+
 The basic idea of this script is download information on ETFs that are
 part of the iShares family, published by Blackrock. Blackrock provides
 basic information on for each ETF on the respective fund’s website. The
@@ -40,6 +42,8 @@ library(xml2)
 ```
 
 # 2\. Download and extract data
+
+[Get to Top](#table-of-contents)
 
 Blackrock shows detailed information on its various iShares ETFs on the
 ETF’s website (e.g. [iShares Core € Corp Bond UCITS
@@ -62,6 +66,8 @@ the analysis:
     ## 6 iShares-Core-FTSE-100  https://www.ishares.com/de/privatanleger/de/produkte/2~
 
 ## 2.a Get XML data
+
+[Get to Top](#table-of-contents)
 
 The Excel files provided by iShares are not “real” Excel files but are
 instead XML files created in Excel. The first step is therefore to
@@ -94,6 +100,8 @@ The output from the `get_xml` function is an XML file with 6 nodes:
     ## [6] <ss:Worksheet ss:Name="Aussch&#xC3;&#xBC;ttungen">\n  <ss:Table>\n    <ss ...
 
 ## 2.b Extract sheet “Overview”
+
+[Get to Top](#table-of-contents)
 
 The XML node \#2 contains the sheet “Overview”. The following function
 loops through all cells of the Excel sheet and extracts the overview
@@ -152,6 +160,8 @@ columns containing the basic ETF information:
     ## # ... with 27 more rows
 
 ## 2.c Extract sheet “Historic”
+
+[Get to Top](#table-of-contents)
 
 The XML node \#4 contains the sheet “Historic”. The following function
 loops through all cells of the Excel sheet and extracts information on
@@ -228,6 +238,8 @@ NAV):
 
 ## 2.d Extract sheet “Dividends”
 
+[Get to Top](#table-of-contents)
+
 The XML node \#6 (if included in the XML file) contains the sheet
 “Dividends”. The following function loops through all cells of the
 Excel sheet and extracts information on dividends. Like for the sheet
@@ -300,6 +312,8 @@ columns containing ETF dividends (date, dividend):
 
 ## 2.e Clean download data
 
+[Get to Top](#table-of-contents)
+
 The next step after the download is to clean the data. The data cleaning
 basically consists of changing some special characters and converting
 character columns to numeric and date. The results are saved as:
@@ -366,6 +380,8 @@ clean_dividends <- function(data_xml, data_dividends, file_dividends) {
 ```
 
 ## 2.f Complete function for ishares download
+
+[Get to Top](#table-of-contents)
 
 The complete function to download the ETF data from iShares:
 
@@ -450,11 +466,15 @@ data, historic prices, and dividends:
 
 # 3\. Aggregate data and convert to Euro returns
 
+[Get to Top](#table-of-contents)
+
 The iShares ETFs use three different currencies: US Dollar, British
 Pound, and Euro. Therefore, I convert prices and dividends to Euro in
 order to compre the ETFs.
 
 ## 3.a Get exchange rates
+
+[Get to Top](#table-of-contents)
 
 For the comparison, I download exchange rates provided by the
 [ECB](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html).
@@ -469,6 +489,8 @@ data_fx <- read_csv(unz(file_zip, "eurofxref-hist.csv")) %>%
 ```
 
 ## 3.b Aggregate data and convert to Euro returns
+
+[Get to Top](#table-of-contents)
 
 I loop through the list of ETF names and URLs `[data_etf]` and load the
 individual ETF files extracted and saved in section II. To account for
@@ -563,6 +585,8 @@ for various dates:
 
 # 4\. Analyze historic ETF performance
 
+[Get to Top](#table-of-contents)
+
 For a comparison of the ETFs, I analyze their historic performance,
 using trailling monthly returns. I rely on the following key metrics:
 
@@ -571,7 +595,9 @@ using trailling monthly returns. I rely on the following key metrics:
   - Sharpe ratio
   - Share of months with positive returns
 
-## 4.a Compute trailling monthly returns
+## 4.a Compute trailing monthly returns
+
+[Get to Top](#table-of-contents)
 
 The first step is to map the ETF price data to a list of all possible
 dates and to categorize these dates into 28 groups. Each group is one of
@@ -621,6 +647,8 @@ data_returns <- map(unique(ishares_data$name), ~{
     ## # ... with 91,495 more rows
 
 ## 4.b Compute key metrics
+
+[Get to Top](#table-of-contents)
 
 **Average returns, variance, & Sharpe ratio**
 
@@ -695,3 +723,5 @@ data_returns %>%
 
 These results allow the selection of the best performing iShares ETF for
 investment or can be used for further portfolio analysis.
+
+[Get to Top](#table-of-contents)
