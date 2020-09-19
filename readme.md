@@ -148,14 +148,7 @@ columns containing the basic ETF information:
     ##    parameter                 value             
     ##    <chr>                     <chr>             
     ##  1 BasiswÃ¤hrung             EUR               
-    ##  2 Anlageklasse              Aktien            
-    ##  3 Wertpapierleiheertrag     0,00              
-    ##  4 Auflagedatum              04.Apr.2005       
-    ##  5 Total Expense Ratio       0,31              
-    ##  6 Vergleichsindex           DivDAXÂ®          
-    ##  7 AusschÃ¼ttungshÃ¤ufigkeit Bis zu 4x pro Jahr
-    ##  8 Domizil                   Deutschland       
-    ##  9 Methodik                  Replikation       
+    ##  ...       
     ## 10 Product Structure         Physical          
     ## # ... with 27 more rows
 
@@ -222,18 +215,7 @@ NAV):
     ##    date        currency price  
     ##    <chr>       <chr>    <chr>  
     ##  1 25.Jun.2020 EUR      15.9902
-    ##  2 24.Jun.2020 EUR      15.8887
-    ##  3 19.Jun.2020 EUR      16.1201
-    ##  4 18.Jun.2020 EUR      16.0815
-    ##  5 17.Jun.2020 EUR      16.0786
-    ##  6 16.Jun.2020 EUR      16.0368
-    ##  7 15.Jun.2020 EUR      15.5504
-    ##  8 12.Jun.2020 EUR      15.5913
-    ##  9 11.Jun.2020 EUR      15.5563
-    ## 10 10.Jun.2020 EUR      16.3873
-    ## 11 09.Jun.2020 EUR      16.5336
-    ## 12 08.Jun.2020 EUR      16.8603
-    ## 13 05.Jun.2020 EUR      16.7734
+    ##  ...
     ## 14 04.Jun.2020 EUR      16.1843
 
 ## 2.d Extract sheet “Dividends”
@@ -299,14 +281,7 @@ columns containing ETF dividends (date, dividend):
     ##    date         dividend
     ##    <chr>        <chr>   
     ##  1 25.MÃ¤r.2020 0       
-    ##  2 27.Dez.2019  0       
-    ##  3 24.Sep.2019  0       
-    ##  4 24.Jun.2019  0.422498
-    ##  5 25.MÃ¤r.2019 0       
-    ##  6 28.Dez.2018  0       
-    ##  7 26.Sep.2018  0       
-    ##  8 26.Jun.2018  0.414135
-    ##  9 08.JÃ¤n.2018 0       
+    ##  ...      
     ## 10 02.JÃ¤n.2018 0       
     ## # ... with 24 more rows
 
@@ -416,14 +391,7 @@ data, historic prices, and dividends:
     ##    parameter               value             
     ##    <chr>                   <chr>             
     ##  1 Basiswährung            EUR               
-    ##  2 Anlageklasse            Aktien            
-    ##  3 Wertpapierleiheertrag   0,00              
-    ##  4 Auflagedatum            04.Apr.2005       
-    ##  5 Total Expense Ratio     0,31              
-    ##  6 Vergleichsindex         DivDAX®           
-    ##  7 Ausschüttungshäufigkeit Bis zu 4x pro Jahr
-    ##  8 Domizil                 Deutschland       
-    ##  9 Methodik                Replikation       
+    ##  ...      
     ## 10 Product Structure       Physical          
     ## # ... with 27 more rows
 
@@ -431,14 +399,7 @@ data, historic prices, and dividends:
     ##    date       currency price
     ##    <date>     <chr>    <dbl>
     ##  1 2020-06-19 EUR       16.1
-    ##  2 2020-06-18 EUR       16.1
-    ##  3 2020-06-17 EUR       16.1
-    ##  4 2020-06-16 EUR       16.0
-    ##  5 2020-06-15 EUR       15.6
-    ##  6 2020-06-12 EUR       15.6
-    ##  7 2020-06-11 EUR       15.6
-    ##  8 2020-06-10 EUR       16.4
-    ##  9 2020-06-09 EUR       16.5
+    ##  ...
     ## 10 2020-06-08 EUR       16.9
     ## # ... with 3,843 more rows
 
@@ -446,21 +407,7 @@ data, historic prices, and dividends:
     ##    date       dividend
     ##    <date>        <dbl>
     ##  1 2019-06-24   0.422 
-    ##  2 2018-06-26   0.414 
-    ##  3 2017-06-26   0.303 
-    ##  4 2016-09-26   0.0162
-    ##  5 2016-06-24   0.363 
-    ##  6 2016-03-29   0.0344
-    ##  7 2015-06-24   0.488 
-    ##  8 2014-05-30   0.422 
-    ##  9 2013-05-31   0.469 
-    ## 10 2012-05-31   0.498 
-    ## 11 2011-05-31   0.477 
-    ## 12 2010-05-31   0.433 
-    ## 13 2009-05-31   0.433 
-    ## 14 2008-07-15   0.609 
-    ## 15 2007-07-16   0.503 
-    ## 16 2006-07-17   0.344 
+    ##  ...
     ## 17 2005-07-15   0.251 
     ## 18 NA           0.0344
 
@@ -542,14 +489,7 @@ currency, price) containing the aggregated data for all ETFs:
     ##    name   isin         date       currency price
     ##    <chr>  <chr>        <date>     <chr>    <dbl>
     ##  1 DivDAX DE0002635273 2020-06-19 EUR       16.1
-    ##  2 DivDAX DE0002635273 2020-06-18 EUR       16.1
-    ##  3 DivDAX DE0002635273 2020-06-17 EUR       16.1
-    ##  4 DivDAX DE0002635273 2020-06-16 EUR       16.0
-    ##  5 DivDAX DE0002635273 2020-06-15 EUR       15.6
-    ##  6 DivDAX DE0002635273 2020-06-12 EUR       15.6
-    ##  7 DivDAX DE0002635273 2020-06-11 EUR       15.6
-    ##  8 DivDAX DE0002635273 2020-06-10 EUR       16.4
-    ##  9 DivDAX DE0002635273 2020-06-09 EUR       16.5
+    ##  ...
     ## 10 DivDAX DE0002635273 2020-06-08 EUR       16.9
     ## # ... with 95,198 more rows
 
@@ -572,14 +512,7 @@ for various dates:
     ##    name   isin         date       price
     ##    <chr>  <chr>        <date>     <dbl>
     ##  1 DivDAX DE0002635273 2020-06-19  16.1
-    ##  2 DivDAX DE0002635273 2020-06-18  16.1
-    ##  3 DivDAX DE0002635273 2020-06-17  16.1
-    ##  4 DivDAX DE0002635273 2020-06-16  16.0
-    ##  5 DivDAX DE0002635273 2020-06-15  15.6
-    ##  6 DivDAX DE0002635273 2020-06-12  15.6
-    ##  7 DivDAX DE0002635273 2020-06-11  15.6
-    ##  8 DivDAX DE0002635273 2020-06-10  16.4
-    ##  9 DivDAX DE0002635273 2020-06-09  16.5
+    ##  ...
     ## 10 DivDAX DE0002635273 2020-06-08  16.9
     ## # ... with 95,198 more rows
 
@@ -635,14 +568,7 @@ data_returns <- map(unique(ishares_data$name), ~{
     ##    isin         name   date         return
     ##    <chr>        <chr>  <date>        <dbl>
     ##  1 DE0002635273 DivDAX 2005-05-02 -0.0127 
-    ##  2 DE0002635273 DivDAX 2005-05-03 -0.0201 
-    ##  3 DE0002635273 DivDAX 2005-05-04 -0.0213 
-    ##  4 DE0002635273 DivDAX 2005-05-05 -0.0158 
-    ##  5 DE0002635273 DivDAX 2005-05-06 -0.0173 
-    ##  6 DE0002635273 DivDAX 2005-05-09 -0.0163 
-    ##  7 DE0002635273 DivDAX 2005-05-10 -0.0201 
-    ##  8 DE0002635273 DivDAX 2005-05-11 -0.0179 
-    ##  9 DE0002635273 DivDAX 2005-05-12 -0.0192 
+    ##  ... 
     ## 10 DE0002635273 DivDAX 2005-05-13 -0.00950
     ## # ... with 91,495 more rows
 
