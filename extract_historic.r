@@ -1,40 +1,21 @@
 extract_historic <- function(data_xml, file_price){
-  xml_price <- data_xml %>%
-    xml_child(4) %>%
-    xml_child(1)
-
-  if (file.exists(file_price)) {
-    old_price <- read_tsv(file_price)
-    cnt_rows <- min(xml_length(xml_price), xml_length(xml_price) - nrow(old_price) + 5)
-  } else {
-    cnt_rows <- xml_length(xml_price)
+  if (xml_length(data_xml) > 4) { # some files use a different data structure
+    data_prices <- get_values(data_xml, 4)
+  } else if (xml_length(data_xml) == 4) {
+    data_prices <- get_values(data_xml, 3)
   }
+  data_prices <- map_dfr(data_prices[-1], ~ { # row 1 contains the rownames
+    tibble(
+      name = etf_name,
+      date = .x[[1]], 
+      currency = .x[[2]], 
+      price = .x[[3]]
+      )
+  }) %>%
+    mutate(date = str_replace_all(date, "\u00C3\u00a4", "\u00e4")) %>%
+    mutate(date = str_replace(date, "Jan", "J\u00e4n")) %>%
+    mutate(date = as.Date(date, format = "%d.%b.%Y")) %>%
+    mutate(price = as.numeric(price))
   
-  out_cols <- vector(mode = "character", length = 3)
-  out_rows <- vector(mode = "list", length = cnt_rows - 1)
-  
-  pb <- progress_bar$new(total = cnt_rows - 1, format = "[:bar] :percent")
-  
-  for (i in seq(2, cnt_rows)) {
-    xml_row <- xml_price %>%
-      xml_child(i)
-    
-    out_cols[[1]] <- xml_row %>%
-      xml_child(1) %>%
-      xml_text()
-    
-    out_cols[[2]] <- xml_row %>%
-      xml_child(2) %>%
-      xml_text()
-    
-    out_cols[[3]] <- xml_row %>%
-      xml_child(3) %>%
-      xml_text()
-    
-    out_rows[[i - 1]] <- out_cols
-    pb$tick()
-  }
-  
-  out <- map_dfr(out_rows, ~ tibble(date = .x[1], currency = .x[2], price = .x[3]))
-  return(out)
+  write_csv(data_prices, file_prices)
 }

@@ -1,40 +1,25 @@
 extract_dividends <- function(data_xml, file_dividends){
   if (xml_length(data_xml) == 6) {
-    xml_dividends <- data_xml %>%
-      xml_child(6) %>%
-      xml_child(1)
-    
-    if (file.exists(file_dividends)) {
-      old_dividends <- read_tsv(file_dividends)
-      cnt_rows <- min(xml_length(xml_dividends), xml_length(xml_dividends) - nrow(old_dividends) + 5)
-    } else {
-      cnt_rows <- xml_length(xml_dividends)
-    }
-    
-    out_cols <- vector(mode = "character", length = 2)
-    out_rows <- vector(mode = "list", length = cnt_rows - 1)
-    
-    pb <- progress_bar$new(total = cnt_rows - 1, format = "[:bar] :percent")
-    
-    for (i in seq(2, cnt_rows)) {
-      xml_row <- xml_dividends %>%
-        xml_child(i)
-      
-      out_cols[[1]] <- xml_row %>%
-        xml_child(1) %>%
-        xml_text()
-      
-      out_cols[[2]] <- xml_row %>%
-        xml_child(4) %>%
-        xml_text()
-      
-      out_rows[[i - 1]] <- out_cols
-      pb$tick()
-    }
-    
-    out <- map_dfr(out_rows, ~ tibble(date = .x[1], dividend = .x[2]))
+    data_dividends <- get_values(data_xml, 6)
+    data_dividends <- map_dfr(data_dividends[-1], ~ { # row 1 contains the rownames
+      tibble(
+        name = etf_name,
+        date = .x[[3]], 
+        dividend = .x[[4]]
+        )
+    }) %>%
+      mutate(date = str_replace_all(date, "\u00C3\u00a4", "\u00e4")) %>%
+      mutate(date = str_replace(date, "Jan", "J\u00e4n")) %>%
+      mutate(date = as.Date(date, format = "%d.%b.%Y")) %>%
+      mutate(dividend = as.numeric(dividend)) %>%
+      filter(!is.na(dividend) & dividend != 0)
   } else {
-    out <- tibble(date = NA, dividend = NA)
+    data_dividends <- tibble(
+      name = etf_name,
+      date = Sys.Date(), 
+      dividend = 0
+      )
   }
-  return(out)
+  
+  write_csv(data_dividend, file_dividend)
 }

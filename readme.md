@@ -9,8 +9,7 @@ iShares
     - [2.b Extract sheet “Overview”](#2b-extract-sheet-overview)
     - [2.c Extract sheet “Historic”](#2c-extract-sheet-historic)
     - [2.d Extract sheet “Dividends”](#2d-extract-sheet-dividends)
-    - [2.e Clean download data](#2e-clean-download-data)
-    - [2.f Complete function for ishares download](#2f-complete-function-for-ishares-download)
+    - [2.e Complete function for ishares download](#2f-complete-function-for-ishares-download)
   - [3\. Aggregate data and convert to Euro returns](#3-aggregate-data-and-convert-to-euro-returns)
     - [3.a Get exchange rates](#3a-get-exchange-rates)
     - [3.b Aggregate data and convert to Euro returns](#3b-aggregate-data-and-convert-to-euro-returns)
@@ -36,7 +35,6 @@ The code uses the following `R` packages:
 ``` r
 library(knitr)
 library(lubridate)
-library(progress)
 library(tidyverse)
 library(xml2)
 ```
@@ -81,7 +79,7 @@ get_xml <- function(etf_url) {
   download.file(etf_url, file_raw)
   txt <- readLines(file_raw, encoding = "UTF-8-BOM")
   txt[1] <- "<?xml version=\"1.0\"?>"
-  txt <- str_replace_all(txt, "S&P", "SP")
+  txt <- str_replace_all(txt, "&", "")
   write_lines(txt, file_xml)
   out <- read_xml(file_xml)
   return(out)
@@ -103,41 +101,48 @@ The output from the `get_xml` function is an XML file with 6 nodes:
 
 [Get to Top](#table-of-contents)
 
+To extract data from the XML, I use the following function to find rows
+and cell values in the structure:
+
+``` r
+get_values <- function(data_xml, child) {
+  ns <- xml_ns(data_xml)
+  rows <- xml_find_all(xml_child(data_xml, child), ".//ss:Table/ss:Row", ns = ns)
+  values <- map(rows, ~{
+    .x %>%
+      xml_find_all(".//ss:Cell/ss:Data", ns = ns) %>%
+      xml_text() %>%
+      unlist()
+  })
+  return(values)
+}
+```
+
 The XML node \#2 contains the sheet “Overview”. The following function
-loops through all cells of the Excel sheet and extracts the overview
-information.
+loops through all rows and cells of the Excel sheet and extracts the
+overview information.
 
 ``` r
 extract_overview <- function(data_xml) {
-  xml_overview <- data_xml %>%
-    xml_child(2) %>%
-    xml_child(1)
+  data_overview <- get_values(data_xml, 2)
+  data_overview <- data_overview[-c(1:4)] %>% # rows 1:4 do not include important information
+  map_dfr(~ { 
+    tibble(
+      name = etf_name,
+      parameter = .x[[1]], 
+      value = .x[[2]]
+      )
+  }) %>%
+    mutate(parameter = str_replace_all(parameter, "\u00C3\u00a4", "\u00e4"))%>%
+    mutate(parameter = str_replace_all(parameter, "\u00C3\u00b6", "\u00f6"))%>%
+    mutate(parameter = str_replace_all(parameter, "\u00C3\u00bc", "\u00fc")) %>%
+    mutate(parameter = str_remove_all(parameter, "\u00C3")) %>%
+    mutate(value = str_replace_all(value, "\u00C3\u00a4", "\u00e4"))%>%
+    mutate(value = str_replace_all(value, "\u00C3\u00b6", "\u00f6"))%>%
+    mutate(value = str_replace_all(value, "\u00C3\u00bc", "\u00fc")) %>%
+    mutate(value = str_remove_all(value, "\u00C3"))
   
-  cnt_rows <- xml_length(xml_overview)
-  
-  out_cols <- vector(mode = "character", length = 2)
-  out_rows <- vector(mode = "list", length = cnt_rows - 4)
-  
-  pb <- progress_bar$new(total = cnt_rows, format = "[:bar] :percent")
-  
-  for (i in seq(5, cnt_rows)) {
-    xml_row <- xml_overview %>%
-      xml_child(i)
-    
-    out_cols[[1]] <- xml_row %>%
-      xml_child(1) %>%
-      xml_text()
-    
-    out_cols[[2]] <- xml_row %>%
-      xml_child(2) %>%
-      xml_text()
-    
-    out_rows[[i - 4]] <- out_cols
-    pb$tick()
-  }
-  
-  out <- map_dfr(out_rows, ~ tibble(parameter = .x[1], value = .x[2]))
-  return(out)
+  write_csv(data_overview, file_overview)
 }
 ```
 
@@ -157,57 +162,34 @@ columns containing the basic ETF information:
 [Get to Top](#table-of-contents)
 
 The XML node \#4 contains the sheet “Historic”. The following function
-loops through all cells of the Excel sheet and extracts information on
-historic prices. Since looping through 7 columns \* \> 1000 rows is time
-consuming, the function checks whether this information has alredy been
-extracted previously. It compares the number of rows of the output file
-`[etf_name]_price.tsv` to the downloaded file and extracts only the rows
-not contained in the output file.
+loops through all rows cells of the Excel sheet and extracts information
+on historic prices.
 
 ``` r
 extract_historic <- function(data_xml, file_price){
-  xml_price <- data_xml %>%
-    xml_child(4) %>%
-    xml_child(1)
-
-  if (file.exists(file_price)) {
-    old_price <- read_tsv(file_price)
-    cnt_rows <- min(xml_length(xml_price), xml_length(xml_price) - nrow(old_price) + 5)
-  } else {
-    cnt_rows <- xml_length(xml_price)
+  if (xml_length(data_xml) > 4) { # some files use a different data structure
+    data_prices <- get_values(data_xml, 4)
+  } else if (xml_length(data_xml) == 4) {
+    data_prices <- get_values(data_xml, 3)
   }
+  data_prices <- map_dfr(data_prices[-1], ~ { # row 1 contains the rownames
+    tibble(
+      name = etf_name,
+      date = .x[[1]], 
+      currency = .x[[2]], 
+      price = .x[[3]]
+      )
+  }) %>%
+    mutate(date = str_replace_all(date, "\u00C3\u00a4", "\u00e4")) %>%
+    mutate(date = str_replace(date, "Jan", "J\u00e4n")) %>%
+    mutate(date = as.Date(date, format = "%d.%b.%Y")) %>%
+    mutate(price = as.numeric(price))
   
-  out_cols <- vector(mode = "character", length = 3)
-  out_rows <- vector(mode = "list", length = cnt_rows - 1)
-  
-  pb <- progress_bar$new(total = cnt_rows - 1, format = "[:bar] :percent")
-  
-  for (i in seq(2, cnt_rows)) {
-    xml_row <- xml_price %>%
-      xml_child(i)
-    
-    out_cols[[1]] <- xml_row %>%
-      xml_child(1) %>%
-      xml_text()
-    
-    out_cols[[2]] <- xml_row %>%
-      xml_child(2) %>%
-      xml_text()
-    
-    out_cols[[3]] <- xml_row %>%
-      xml_child(3) %>%
-      xml_text()
-    
-    out_rows[[i - 1]] <- out_cols
-    pb$tick()
-  }
-  
-  out <- map_dfr(out_rows, ~ tibble(date = .x[1], currency = .x[2], price = .x[3]))
-  return(out)
+  write_csv(data_prices, file_prices)
 }
 ```
 
-The output from the `extract_price` function is a tibble with three
+The output from the `extract_historic` function is a tibble with three
 columns containing historic ETF information (date, currency, price \~
 NAV):
 
@@ -223,54 +205,34 @@ NAV):
 [Get to Top](#table-of-contents)
 
 The XML node \#6 (if included in the XML file) contains the sheet
-“Dividends”. The following function loops through all cells of the
-Excel sheet and extracts information on dividends. Like for the sheet
-“Historic”, looping through all cells can be time consuming. Again,
-the function checks whether this information has alredy been extracted
-previously and compares the number of rows of the output file
-`[etf_name]_dividends.tsv` to the downloaded file and extracts only the
-rows not contained in the output file.
+“Dividends”. The following function loops through all rows and cells
+of the Excel sheet and extracts information on dividends.
 
 ``` r
 extract_dividends <- function(data_xml, file_dividends){
   if (xml_length(data_xml) == 6) {
-    xml_dividends <- data_xml %>%
-      xml_child(6) %>%
-      xml_child(1)
-    
-    if (file.exists(file_dividends)) {
-      old_dividends <- read_tsv(file_dividends)
-      cnt_rows <- min(xml_length(xml_dividends), xml_length(xml_dividends) - nrow(old_dividends) + 5)
-    } else {
-      cnt_rows <- xml_length(xml_dividends)
-    }
-    
-    out_cols <- vector(mode = "character", length = 2)
-    out_rows <- vector(mode = "list", length = cnt_rows - 1)
-    
-    pb <- progress_bar$new(total = cnt_rows - 1, format = "[:bar] :percent")
-    
-    for (i in seq(2, cnt_rows)) {
-      xml_row <- xml_dividends %>%
-        xml_child(i)
-      
-      out_cols[[1]] <- xml_row %>%
-        xml_child(1) %>%
-        xml_text()
-      
-      out_cols[[2]] <- xml_row %>%
-        xml_child(4) %>%
-        xml_text()
-      
-      out_rows[[i - 1]] <- out_cols
-      pb$tick()
-    }
-    
-    out <- map_dfr(out_rows, ~ tibble(date = .x[1], dividend = .x[2]))
+    data_dividends <- get_values(data_xml, 6)
+    data_dividends <- map_dfr(data_dividends[-1], ~ { # row 1 contains the rownames
+      tibble(
+        name = etf_name,
+        date = .x[[3]], 
+        dividend = .x[[4]]
+        )
+    }) %>%
+      mutate(date = str_replace_all(date, "\u00C3\u00a4", "\u00e4")) %>%
+      mutate(date = str_replace(date, "Jan", "J\u00e4n")) %>%
+      mutate(date = as.Date(date, format = "%d.%b.%Y")) %>%
+      mutate(dividend = as.numeric(dividend)) %>%
+      filter(!is.na(dividend) & dividend != 0)
   } else {
-    out <- tibble(date = NA, dividend = NA)
+    data_dividends <- tibble(
+      name = etf_name,
+      date = Sys.Date(), 
+      dividend = 0
+      )
   }
-  return(out)
+  
+  write_csv(data_dividend, file_dividend)
 }
 ```
 
@@ -285,76 +247,15 @@ columns containing ETF dividends (date, dividend):
     ## 10 02.JÃ¤n.2018 0       
     ## # ... with 24 more rows
 
-## 2.e Clean download data
+After the download the results are saved as:
 
-[Get to Top](#table-of-contents)
-
-The next step after the download is to clean the data. The data cleaning
-basically consists of changing some special characters and converting
-character columns to numeric and date. The results are saved as:
-
-  - `[etf_name]_overview.tsv`
-  - `[etf_name]_prices.tsv`
-  - `[etf_name]_dividends.tsv`
+  - `[etf_name]_overview.csv`
+  - `[etf_name]_prices.csv`
+  - `[etf_name]_dividends.csv`
 
 <!-- end list -->
 
-``` r
-clean_overview <- function(data_overview, file_overview) {
-  data_overview <- data_overview %>%
-    mutate(parameter = str_replace_all(parameter, "\u00C3\u00a4", "\u00e4"))%>%
-    mutate(parameter = str_replace_all(parameter, "\u00C3\u00b6", "\u00f6"))%>%
-    mutate(parameter = str_replace_all(parameter, "\u00C3\u00bc", "\u00fc")) %>%
-    mutate(parameter = str_remove_all(parameter, "\u00C3")) %>%
-    mutate(value = str_replace_all(value, "\u00C3\u00a4", "\u00e4"))%>%
-    mutate(value = str_replace_all(value, "\u00C3\u00b6", "\u00f6"))%>%
-    mutate(value = str_replace_all(value, "\u00C3\u00bc", "\u00fc")) %>%
-    mutate(value = str_remove_all(value, "\u00C3"))
-  
-  write_tsv(data_overview, file_overview)
-}
-
-clean_price <- function(data_price, file_price) {
-  data_price <- data_price %>%
-    mutate(date = str_replace_all(date, "\u00C3\u00a4", "\u00e4")) %>%
-    mutate(date = str_replace(date, "Jan", "J\u00e4n")) %>%
-    mutate(date = as.Date(date, format = "%d.%b.%Y")) %>%
-    mutate(price = as.numeric(price))
-  
-  if (file.exists(file_price)) {
-    data_price <- bind_rows(data_price, read_tsv(file_price)) %>%
-      unique() %>%
-      group_by(date) %>%
-      filter(row_number() == 1) %>%
-      ungroup() %>%
-      arrange(desc(date))
-  }
-  
-  write_tsv(data_price, file_price)
-}
-  
-clean_dividends <- function(data_xml, data_dividends, file_dividends) {
-  data_dividends <- data_dividends %>%
-    mutate(date = str_replace_all(date, "\u00C3\u00a4", "\u00e4")) %>%
-    mutate(date = str_replace(date, "Jan", "J\u00e4n")) %>%
-    mutate(date = as.Date(date, format = "%d.%b.%Y")) %>%
-    mutate(dividend = as.numeric(dividend)) %>%
-    filter(!is.na(dividend) & dividend != 0)
-  
-  if (xml_length(data_xml) == 6 & file.exists(file_dividends)) {
-	data_dividends <- bind_rows(data_dividends, read_tsv(file_dividends)) %>%
-      unique() %>%
-      group_by(date) %>%
-      filter(row_number() == 1) %>%
-      ungroup() %>%
-      arrange(desc(date))
-  }
-  
-  write_tsv(data_dividends, file_dividends)
-}
-```
-
-## 2.f Complete function for ishares download
+## 2.e Complete function for ishares download
 
 [Get to Top](#table-of-contents)
 
@@ -362,18 +263,14 @@ The complete function to download the ETF data from iShares:
 
 ``` r
 download_ishares <- function(etf_name, etf_url) {
-  file_overview <- file.path(dir_price, str_c(etf_name, "_overview.tsv"))
-  file_price <- file.path(dir_price, str_c(etf_name, "_price.tsv"))
-  file_dividends <- file.path(dir_price, str_c(etf_name, "_dividends.tsv"))
+  file_overview <- file.path(dir_price, str_c(etf_name, "_overview.csv"))
+  file_price <- file.path(dir_price, str_c(etf_name, "_price.csv"))
+  file_dividends <- file.path(dir_price, str_c(etf_name, "_dividends.csv"))
   
   data_xml <- get_xml(etf_url)
   data_overview <- extract_overview(data_xml)
   data_price <- extract_historic(data_xml, file_price)
   data_dividends <- extract_dividends(data_xml, file_dividends)
-  
-  clean_overview(data_overview, file_overview)
-  clean_price(data_price, file_price)
-  clean_dividends(data_xml, data_dividends, file_dividends)
 }
 ```
 
@@ -449,9 +346,9 @@ payouts are reduced by a capital gains tax rate of 27.5%.
 ishares_data <- map(data_etf$name, ~{
 
   # load files
-  overview <- read_tsv(file.path(dir_overview, str_c(.x, "_overview.tsv")))
-  price <- read_tsv(file.path(dir_price, str_c(.x, "_price.tsv")))
-  dividends <- read_tsv(file.path(dir_dividends, str_c(.x, "_dividends.tsv")))
+  overview <- read_csv(file.path(dir_overview, str_c(.x, "_overview.csv")))
+  price <- read_csv(file.path(dir_price, str_c(.x, "_price.csv")))
+  dividends <- read_csv(file.path(dir_dividends, str_c(.x, "_dividends.csv")))
   
   # get metadata
   name <- .x
