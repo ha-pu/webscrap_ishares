@@ -85,7 +85,7 @@ get_xml <- function(etf_url) {
 }
 ```
 
-The output from the `get_xml` function is an XML file with 6 nodes:
+The output from the `get_xml` function is an XML file with six nodes:
 
 	#> {xml_document}
 	#> <Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
@@ -95,6 +95,9 @@ The output from the `get_xml` function is an XML file with 6 nodes:
 	#> [4] <ss:Worksheet ss:Name="Historisch">\n  <ss:Table>\n    <ss:Row>\n      <s ...
 	#> [5] <ss:Worksheet ss:Name="Wertentwicklung">\n  <ss:Table>\n    <ss:Row>\n    ...
 	#> [6] <ss:Worksheet ss:Name="Aussch&#xC3;&#xBC;ttungen">\n  <ss:Table>\n    <ss ...
+
+Depending on the file structure, the number of nodes can vary between
+four and six. The functions below catch these differences.
 
 ## 2.b Extract sheet “Overview”
 
@@ -152,14 +155,7 @@ columns containing the basic ETF information:
 	#>    name              parameter            value                                 
 	#>    <chr>             <chr>                <chr>                                 
 	#>  1 iShares-Asia-Pac~ Basiswährung         USD                                   
-	#>  2 iShares-Asia-Pac~ Anlageklasse         Aktien                                
-	#>  3 iShares-Asia-Pac~ Wertpapierleiheertr~ 0,07                                  
-	#>  4 iShares-Asia-Pac~ Auflagedatum         02.Jun.2006                           
-	#>  5 iShares-Asia-Pac~ Gesamtkostenquote (~ 0,59                                  
-	#>  6 iShares-Asia-Pac~ Vergleichsindex      Dow Jones Asia/Pacific Select Dividen~
-	#>  7 iShares-Asia-Pac~ Ausschüttungshäufig~ Vierteljährlich                       
-	#>  8 iShares-Asia-Pac~ Domizil              Irland                                
-	#>  9 iShares-Asia-Pac~ Methodik             Replikation                           
+	#> ...
 	#> 10 iShares-Asia-Pac~ Produktstruktur      Physisch                              
 	#> # ... with 26 more rows
 
@@ -203,14 +199,7 @@ NAV):
 	#>    name                 date       currency price
 	#>    <chr>                <date>     <chr>    <dbl>
 	#>  1 iShares-Asia-Pacific 2021-02-10 USD       24.7
-	#>  2 iShares-Asia-Pacific 2021-02-09 USD       24.5
-	#>  3 iShares-Asia-Pacific 2021-02-08 USD       24.5
-	#>  4 iShares-Asia-Pacific 2021-02-05 USD       24.2
-	#>  5 iShares-Asia-Pacific 2021-02-04 USD       24.1
-	#>  6 iShares-Asia-Pacific 2021-02-03 USD       24.2
-	#>  7 iShares-Asia-Pacific 2021-02-02 USD       24.0
-	#>  8 iShares-Asia-Pacific 2021-02-01 USD       23.9
-	#>  9 iShares-Asia-Pacific 2021-01-29 USD       23.7
+	#> ...
 	#> 10 iShares-Asia-Pacific 2021-01-28 USD       23.9
 	#> # ... with 3,763 more rows
 
@@ -257,14 +246,7 @@ columns containing ETF dividends (date, dividend):
 	#>    name                 date       dividend
 	#>    <chr>                <date>        <dbl>
 	#>  1 iShares-Asia-Pacific 2020-12-23    0.258
-	#>  2 iShares-Asia-Pacific 2020-09-30    0.157
-	#>  3 iShares-Asia-Pacific 2020-06-24    0.253
-	#>  4 iShares-Asia-Pacific 2020-03-25    0.148
-	#>  5 iShares-Asia-Pacific 2019-12-27    0.391
-	#>  6 iShares-Asia-Pacific 2019-09-25    0.281
-	#>  7 iShares-Asia-Pacific 2019-06-26    0.582
-	#>  8 iShares-Asia-Pacific 2019-03-27    0.222
-	#>  9 iShares-Asia-Pacific 2018-12-28    0.436
+	#> ...
 	#> 10 iShares-Asia-Pacific 2018-09-26    0.388
 	#> # ... with 48 more rows
 
