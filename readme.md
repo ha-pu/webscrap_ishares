@@ -53,15 +53,14 @@ ETFs](https://www.ishares.com/de/privatanleger/de/anlegen/bestseller). A
 list of ETF names and URLs to the respective Excel file is the basis for
 the analysis:
 
-    ## # A tibble: 6 x 2
-    ##   name                   url                                                    
-    ##   <chr>                  <chr>                                                  
-    ## 1 DivDAX                 https://www.blackrock.com/at/individual/produkte/25176~
-    ## 2 iShares-Core-Corp-Bond https://www.ishares.com/de/privatanleger/de/produkte/2~
-    ## 3 Dow-Jones-Global-Tita~ https://www.ishares.com/de/privatanleger/de/produkte/2~
-    ## 4 iShares-Core-DAX       https://www.ishares.com/de/privatanleger/de/produkte/2~
-    ## 5 Dow-Jones-US-Select-D~ https://www.ishares.com/de/privatanleger/de/produkte/2~
-    ## 6 iShares-Core-FTSE-100  https://www.ishares.com/de/privatanleger/de/produkte/2~
+	#> # A tibble: 49 x 2
+	#>    name                     url                                                 
+	#>    <chr>                    <chr>                                               
+	#>  1 iShares-Asia-Pacific     https://www.ishares.com/de/privatanleger/de/produkt~
+	#>  2 iShares-Core-Corp-Bond   https://www.ishares.com/de/privatanleger/de/produkt~
+	#>  3 iShares-Core-DAX         https://www.ishares.com/de/privatanleger/de/produkt~
+	#>  4 iShares-Core-EURO-STOXX~ https://www.ishares.com/de/privatanleger/de/produkt~
+	#>  5 iShares-Core-FTSE-100    https://www.ishares.com/de/privatanleger/de/produkt~
 
 ## 2.a Get XML data
 
@@ -88,14 +87,14 @@ get_xml <- function(etf_url) {
 
 The output from the `get_xml` function is an XML file with 6 nodes:
 
-    ## {xml_document}
-    ## <Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-    ## [1] <ss:Styles>\n  <ss:Style ss:ID="Default">\n    <ss:Alignment ss:Horizonta ...
-    ## [2] <ss:Worksheet ss:Name="&#xC3;&#x153;berblick">\n  <ss:Table>\n    <ss:Row ...
-    ## [3] <ss:Worksheet ss:Name="Positionen">\n  <ss:Table>\n    <ss:Row>\n      <s ...
-    ## [4] <ss:Worksheet ss:Name="Historisch">\n  <ss:Table>\n    <ss:Row>\n      <s ...
-    ## [5] <ss:Worksheet ss:Name="Wertentwicklung">\n  <ss:Table>\n    <ss:Row>\n    ...
-    ## [6] <ss:Worksheet ss:Name="Aussch&#xC3;&#xBC;ttungen">\n  <ss:Table>\n    <ss ...
+	#> {xml_document}
+	#> <Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+	#> [1] <ss:Styles>\n  <ss:Style ss:ID="Default">\n    <ss:Alignment ss:Horizonta ...
+	#> [2] <ss:Worksheet ss:Name="&#xC3;&#x153;berblick">\n  <ss:Table>\n    <ss:Row ...
+	#> [3] <ss:Worksheet ss:Name="Positionen">\n  <ss:Table>\n    <ss:Row>\n      <s ...
+	#> [4] <ss:Worksheet ss:Name="Historisch">\n  <ss:Table>\n    <ss:Row>\n      <s ...
+	#> [5] <ss:Worksheet ss:Name="Wertentwicklung">\n  <ss:Table>\n    <ss:Row>\n    ...
+	#> [6] <ss:Worksheet ss:Name="Aussch&#xC3;&#xBC;ttungen">\n  <ss:Table>\n    <ss ...
 
 ## 2.b Extract sheet “Overview”
 
@@ -149,13 +148,20 @@ extract_overview <- function(data_xml) {
 The output from the `extract_overview` function is a tibble with two
 columns containing the basic ETF information:
 
-    ## # A tibble: 37 x 2
-    ##    parameter                 value             
-    ##    <chr>                     <chr>             
-    ##  1 BasiswÃ¤hrung             EUR               
-    ##  ...       
-    ## 10 Product Structure         Physical          
-    ## # ... with 27 more rows
+	#> # A tibble: 36 x 3
+	#>    name              parameter            value                                 
+	#>    <chr>             <chr>                <chr>                                 
+	#>  1 iShares-Asia-Pac~ Basiswährung         USD                                   
+	#>  2 iShares-Asia-Pac~ Anlageklasse         Aktien                                
+	#>  3 iShares-Asia-Pac~ Wertpapierleiheertr~ 0,07                                  
+	#>  4 iShares-Asia-Pac~ Auflagedatum         02.Jun.2006                           
+	#>  5 iShares-Asia-Pac~ Gesamtkostenquote (~ 0,59                                  
+	#>  6 iShares-Asia-Pac~ Vergleichsindex      Dow Jones Asia/Pacific Select Dividen~
+	#>  7 iShares-Asia-Pac~ Ausschüttungshäufig~ Vierteljährlich                       
+	#>  8 iShares-Asia-Pac~ Domizil              Irland                                
+	#>  9 iShares-Asia-Pac~ Methodik             Replikation                           
+	#> 10 iShares-Asia-Pac~ Produktstruktur      Physisch                              
+	#> # ... with 26 more rows
 
 ## 2.c Extract sheet “Historic”
 
@@ -193,12 +199,20 @@ The output from the `extract_historic` function is a tibble with three
 columns containing historic ETF information (date, currency, price \~
 NAV):
 
-    ## # A tibble: 14 x 3
-    ##    date        currency price  
-    ##    <chr>       <chr>    <chr>  
-    ##  1 25.Jun.2020 EUR      15.9902
-    ##  ...
-    ## 14 04.Jun.2020 EUR      16.1843
+	#> # A tibble: 3,773 x 4
+	#>    name                 date       currency price
+	#>    <chr>                <date>     <chr>    <dbl>
+	#>  1 iShares-Asia-Pacific 2021-02-10 USD       24.7
+	#>  2 iShares-Asia-Pacific 2021-02-09 USD       24.5
+	#>  3 iShares-Asia-Pacific 2021-02-08 USD       24.5
+	#>  4 iShares-Asia-Pacific 2021-02-05 USD       24.2
+	#>  5 iShares-Asia-Pacific 2021-02-04 USD       24.1
+	#>  6 iShares-Asia-Pacific 2021-02-03 USD       24.2
+	#>  7 iShares-Asia-Pacific 2021-02-02 USD       24.0
+	#>  8 iShares-Asia-Pacific 2021-02-01 USD       23.9
+	#>  9 iShares-Asia-Pacific 2021-01-29 USD       23.7
+	#> 10 iShares-Asia-Pacific 2021-01-28 USD       23.9
+	#> # ... with 3,763 more rows
 
 ## 2.d Extract sheet “Dividends”
 
@@ -239,21 +253,20 @@ extract_dividends <- function(data_xml, file_dividends){
 The output from the `extract_dividends` function is a tibble with two
 columns containing ETF dividends (date, dividend):
 
-    ## # A tibble: 34 x 2
-    ##    date         dividend
-    ##    <chr>        <chr>   
-    ##  1 25.MÃ¤r.2020 0       
-    ##  ...      
-    ## 10 02.JÃ¤n.2018 0       
-    ## # ... with 24 more rows
-
-After the download the results are saved as:
-
-  - `[etf_name]_overview.csv`
-  - `[etf_name]_prices.csv`
-  - `[etf_name]_dividends.csv`
-
-<!-- end list -->
+	#> # A tibble: 58 x 3
+	#>    name                 date       dividend
+	#>    <chr>                <date>        <dbl>
+	#>  1 iShares-Asia-Pacific 2020-12-23    0.258
+	#>  2 iShares-Asia-Pacific 2020-09-30    0.157
+	#>  3 iShares-Asia-Pacific 2020-06-24    0.253
+	#>  4 iShares-Asia-Pacific 2020-03-25    0.148
+	#>  5 iShares-Asia-Pacific 2019-12-27    0.391
+	#>  6 iShares-Asia-Pacific 2019-09-25    0.281
+	#>  7 iShares-Asia-Pacific 2019-06-26    0.582
+	#>  8 iShares-Asia-Pacific 2019-03-27    0.222
+	#>  9 iShares-Asia-Pacific 2018-12-28    0.436
+	#> 10 iShares-Asia-Pacific 2018-09-26    0.388
+	#> # ... with 48 more rows
 
 ## 2.e Complete function for ishares download
 
@@ -284,29 +297,11 @@ map2(data_etf$name, data_etf$url, download_ishares)
 The output are three files for each ETF that contain cleaned overview
 data, historic prices, and dividends:
 
-    ## # A tibble: 37 x 2
-    ##    parameter               value             
-    ##    <chr>                   <chr>             
-    ##  1 Basiswährung            EUR               
-    ##  ...      
-    ## 10 Product Structure       Physical          
-    ## # ... with 27 more rows
+  - `[etf_name]_overview.csv`
+  - `[etf_name]_prices.csv`
+  - `[etf_name]_dividends.csv`
 
-    ## # A tibble: 3,853 x 3
-    ##    date       currency price
-    ##    <date>     <chr>    <dbl>
-    ##  1 2020-06-19 EUR       16.1
-    ##  ...
-    ## 10 2020-06-08 EUR       16.9
-    ## # ... with 3,843 more rows
-
-    ## # A tibble: 18 x 2
-    ##    date       dividend
-    ##    <date>        <dbl>
-    ##  1 2019-06-24   0.422 
-    ##  ...
-    ## 17 2005-07-15   0.251 
-    ## 18 NA           0.0344
+<!-- end list -->
 
 # 3\. Aggregate data and convert to Euro returns
 
