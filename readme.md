@@ -12,7 +12,8 @@ iShares
     - [2.e Complete function for ishares download](#2f-complete-function-for-ishares-download)
   - [3\. Aggregate data and convert to Euro returns](#3-aggregate-data-and-convert-to-euro-returns)
     - [3.a Get exchange rates](#3a-get-exchange-rates)
-    - [3.b Aggregate data and convert to Euro returns](#3b-aggregate-data-and-convert-to-euro-returns)
+    - [3.b Convert data to Euro](#3b-convert-data-to-euro-returns)
+	- [3.c Aggregate data](#3c-aggregate-data)
   - [4\. Analyze historic ETF performance](#4-analyze-historic-etf-performance)
     - [4.a Compute trailing monthly returns](#4a-compute-trailing-monthly-returns)
     - [4.b Compute key metrics](#4b-compute-key-metrics)
@@ -72,6 +73,7 @@ download the XML file from iShares, fix some encoding issues in the
 first line for for the character *&*.
 
 ``` r
+# get xml function =============================================================
 get_xml <- function(etf_url) {
   file_raw <- tempfile()
   file_xml <- tempfile()
@@ -107,6 +109,7 @@ To extract data from the XML, I use the following function to find rows
 and cell values in the structure:
 
 ``` r
+# extract values function ======================================================
 get_values <- function(data_xml, child) {
   ns <- xml_ns(data_xml)
   rows <- xml_find_all(xml_child(data_xml, child), ".//ss:Table/ss:Row", ns = ns)
@@ -125,6 +128,7 @@ loops through all rows and cells of the Excel sheet and extracts the
 overview information.
 
 ``` r
+# extract overview function ====================================================
 extract_overview <- function(data_xml) {
   data_overview <- get_values(data_xml, 2)
   data_overview <- data_overview[-c(1:4)] %>% # rows 1:4 do not include important information
@@ -168,6 +172,7 @@ loops through all rows cells of the Excel sheet and extracts information
 on historic prices.
 
 ``` r
+# extract historic function ====================================================
 extract_historic <- function(data_xml, file_price){
   if (xml_length(data_xml) > 4) { # some files use a different data structure
     data_prices <- get_values(data_xml, 4)
@@ -212,6 +217,7 @@ The XML node \#6 (if included in the XML file) contains the sheet
 of the Excel sheet and extracts information on dividends.
 
 ``` r
+# extract dividends function ===================================================
 extract_dividends <- function(data_xml, file_dividends){
   if (xml_length(data_xml) == 6) {
     data_dividends <- get_values(data_xml, 6)
@@ -257,6 +263,7 @@ columns containing ETF dividends (date, dividend):
 The complete function to download the ETF data from iShares:
 
 ``` r
+# combined download function ===================================================
 download_ishares <- function(etf_name, etf_url) {
   file_overview <- file.path(dir_price, str_c(etf_name, "_overview.csv"))
   file_price <- file.path(dir_price, str_c(etf_name, "_price.csv"))
@@ -291,7 +298,7 @@ data, historic prices, and dividends:
 
 The iShares ETFs use three different currencies: US Dollar, British
 Pound, and Euro. Therefore, I convert prices and dividends to Euro in
-order to compre the ETFs.
+order to compare the ETFs.
 
 ## 3.a Get exchange rates
 
@@ -299,96 +306,146 @@ order to compre the ETFs.
 
 For the comparison, I download exchange rates provided by the
 [ECB](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html).
-The ECB offers a ZIP file containing various monthly Euro exchnage rates
+The ECB offers a ZIP file containing various monthly Euro exchange rates
 for download.
 
 ``` r
+# downlad ECB data =============================================================
 file_zip <- tempfile()
 download.file("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip", file_zip)
 data_fx <- read_csv(unz(file_zip, "eurofxref-hist.csv")) %>%
   select(date = Date, usd_rate = USD, gbp_rate = GBP)
 ```
 
-## 3.b Aggregate data and convert to Euro returns
+## 3.b Convert data to Euro
 
 [Get to Top](#table-of-contents)
 
-I loop through the list of ETF names and URLs `[data_etf]` and load the
-individual ETF files extracted and saved in section II. To account for
-dividends, I add the dividend payout to the ETF price \~ net asset
-value, assuming that all dividend payout was reinvested. Dividend
-payouts are reduced by a capital gains tax rate of 27.5%.
+First, I convert all ETF prices and dividends denomminated in USD or
+GDP  to Euro using the exchange rates downloaded from the ECB. I loop
+through the list of ETF names and URLs `[data_etf]` and load the
+individual ETF files extracted and saved in section II. The function
+below loads the files, converts them, and overwrites non-Euro files. 
 
 ``` r
-ishares_data <- map(data_etf$name, ~{
+# conversion function ==========================================================
+convert_ishares <- function(etf_name) {
+  # load files -----------------------------------------------------------------
+  file_price <- file.path(dir_price, str_c(etf_name, "_price.csv"))
+  file_dividends <- file.path(dir_dividends, str_c(etf_name, "_dividends.csv"))
+  price <- read_csv(file_price, col_types = "cDcd")
+  dividends <- read_csv(file_dividends, col_types = "cDd")
+  
+  # set dividends currency -----------------------------------------------------
+  dividends$currency <- unique(price$currency)
+  
+  # convert price --------------------------------------------------------------
+  price %>%
+    left_join(data_fx, by = "date") %>%
+    mutate(
+      price = case_when(
+        currency == "USD" ~ price / usd_rate,
+        currency == "GBP" ~ price / gbp_rate,
+        TRUE ~ price
+      ),
+      currency = "EUR"
+    ) %>%
+    select(
+      -usd_rate, 
+      -gbp_rate
+    ) %>%
+    write_csv(file_price)
+  
+  # convert dividends ----------------------------------------------------------
+  dividends %>%
+    left_join(data_fx, by = "date") %>%
+    mutate(
+      dividend = case_when(
+        currency == "USD" ~ dividend / usd_rate,
+        currency == "GBP" ~ dividend / gbp_rate,
+        TRUE ~ dividend
+      )
+    ) %>%
+    select(
+      -currency,
+      -usd_rate, 
+      -gbp_rate
+    ) %>%
+    write_csv(file_dividends)
+} 
 
-  # load files
+# load etfs ====================================================================
+ishares_url <- read_csv("ishares_url.csv")
+
+# run_downloads ================================================================
+walk(ishares_url$name, convert_ishares)
+```
+
+The result is Euro-denomminated prices and dividends:
+
+	#> # A tibble: 3,773 x 4
+	#>    name                 date       currency price
+	#>    <chr>                <date>     <chr>    <dbl>
+	#>  1 iShares-Asia-Pacific 2021-02-10 EUR       20.3
+	#> ...
+	#> 10 iShares-Asia-Pacific 2021-01-28 EUR       19.8
+	#> # ... with 3,763 more rows
+
+	#> # A tibble: 58 x 3
+	#>    name                 date       dividend
+	#>    <chr>                <date>        <dbl>
+	#>  1 iShares-Asia-Pacific 2020-12-23    0.212
+	#> ...
+	#> 10 iShares-Asia-Pacific 2018-09-26    0.330
+	#> # ... with 48 more rows
+
+## 3.c Aggregate data
+
+[Get to Top](#table-of-contents)
+
+To account for dividends, I add the dividend payout to the ETF
+price \~ net asset value, assuming that all dividend payout was
+reinvested. Dividend payouts are reduced by a capital gains tax
+rate of 27.5%.
+
+``` r
+# aggregate prices and dividends ===============================================
+ishares_data <- map_dfr(data_etf$name, ~{
+  
+  # load files -----------------------------------------------------------------
   overview <- read_csv(file.path(dir_overview, str_c(.x, "_overview.csv")))
   price <- read_csv(file.path(dir_price, str_c(.x, "_price.csv")))
   dividends <- read_csv(file.path(dir_dividends, str_c(.x, "_dividends.csv")))
   
-  # get metadata
-  name <- .x
-  isin <- overview$value[overview$parameter == "ISIN"]
+  # add isin -------------------------------------------------------------------
+  out <- price %>%
+    mutate(isin = overview$value[overview$parameter == "ISIN"])
   
-  # combine data
-  out <- tibble(name, isin) %>%
-    mutate(id = TRUE) %>%
-    left_join(mutate(price, id = TRUE), by = "id") %>%
-    select(-id)
-  
-  # dividends
-  if(dim(dividends)[1] > 0) {
-    out <- out %>%
-      left_join(dividends, by = "date") %>%
-      mutate(dividend = coalesce(dividend * 0.725, 0)) %>%
-      mutate(dividend = cumsum(dividend))
-  } else {
-    out$dividend <- 0
-  }
-  
+  # add dividends --------------------------------------------------------------
   out <- out %>%
+    left_join(dividends, by = c("name", "date")) %>%
+    filter(!is.na(price)) %>%
+    arrange(desc(date)) %>%
+    mutate(dividend = coalesce(dividend * 0.725, 0)) %>%
+    mutate(dividend = cumsum(dividend)) %>%
     mutate(price = price + dividend) %>%
-    select(-dividend)
+    select(-dividend) %>%
+    filter(!is.na(date))
   
   return(out)
-}) %>% bind_rows() %>%
-  filter(!is.na(date))
+})
 ```
 
 The code above results in a table with five columns (name, isin, date,
 currency, price) containing the aggregated data for all ETFs:
 
-    ## # A tibble: 95,208 x 5
-    ##    name   isin         date       currency price
-    ##    <chr>  <chr>        <date>     <chr>    <dbl>
-    ##  1 DivDAX DE0002635273 2020-06-19 EUR       16.1
-    ##  ...
-    ## 10 DivDAX DE0002635273 2020-06-08 EUR       16.9
-    ## # ... with 95,198 more rows
-
-Next, I convert all ETF prices that are not Euro denomminated to Euro
-using the exchange rates downloaded from the ECB.
-
-``` r
-ishares_data <- ishares_data %>%
-  left_join(data_fx, by = "date") %>%
-  mutate(price = case_when(currency == "USD" ~ price / usd_rate,
-                           currency == "GBP" ~ price / gbp_rate,
-                           TRUE ~ price)) %>%
-  select(-currency, -usd_rate, -gbp_rate)
-```
-
-The result is a long-formatted dataframe of Euro-denomminated ETF prices
-for various dates:
-
-    ## # A tibble: 95,208 x 4
-    ##    name   isin         date       price
-    ##    <chr>  <chr>        <date>     <dbl>
-    ##  1 DivDAX DE0002635273 2020-06-19  16.1
-    ##  ...
-    ## 10 DivDAX DE0002635273 2020-06-08  16.9
-    ## # ... with 95,198 more rows
+	#> # A tibble: 139,580 x 5
+	#>    name                 date       currency price isin        
+	#>    <chr>                <date>     <chr>    <dbl> <chr>       
+	#>  1 iShares-Asia-Pacific 2021-02-10 EUR       20.3 IE00B14X4T88
+	#> ...
+	#> 10 iShares-Asia-Pacific 2021-01-28 EUR       19.8 IE00B14X4T88
+	#> # ... with 139,570 more rows
 
 # 4\. Analyze historic ETF performance
 
