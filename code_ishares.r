@@ -1,83 +1,113 @@
-# packages ----
+# packages =====================================================================
 library(knitr)
 library(lubridate)
-library(progress)
 library(tidyverse)
 library(xml2)
 
-# functions ----
+# functions ====================================================================
 source("get_xml.r")
 source("extract_overview.r")
 source("extract_historic.r")
 source("extract_dividends.r")
-source("clean_overview.r")
-source("clean_price.r")
-source("clean_dividends.r")
 source("download_ishares.r")
 
-# parameters ----
+# parameters ===================================================================
 dir_ishares <- "/path/to/folder"
 dir_overview <- file.path(dir_ishares, "ishares_overview")
 dir_price <- file.path(dir_ishares, "ishares_price")
 dir_dividends <- file.path(dir_ishares, "ishares_dividends")
 
-data_etf <- read_tsv(file.path(dir_ishares, "data_ishares_url.tsv"))
+data_etf <- read_csv(file.path(dir_ishares, "data_ishares_url.csv"))
 
-# get xml data ----
+# get xml data =================================================================
 data_xml <- get_xml(data_etf$url[1])
 
-# extract and clean data ----
+# extract and clean data =======================================================
 map2(data_etf$name, data_etf$url, download_ishares)
 
-# get exchange rate data ----
+# get exchange rate data =======================================================
 file_zip <- tempfile()
 download.file("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip", file_zip)
 data_fx <- read_csv(unz(file_zip, "eurofxref-hist.csv")) %>%
   select(date = Date, usd_rate = USD, gbp_rate = GBP)
 
-# aggregate data ----
-ishares_data <- map(data_etf$name, ~{
+# conversion function ==========================================================
+convert_ishares <- function(etf_name) {
+  # load files -----------------------------------------------------------------
+  file_price <- file.path(dir_price, str_c(etf_name, "_price.csv"))
+  file_dividends <- file.path(dir_dividends, str_c(etf_name, "_dividends.csv"))
+  price <- read_csv(file_price, col_types = "cDcd")
+  dividends <- read_csv(file_dividends, col_types = "cDd")
+  
+  # set dividends currency -----------------------------------------------------
+  dividends$currency <- unique(price$currency)
+  
+  # convert price --------------------------------------------------------------
+  price %>%
+    left_join(data_fx, by = "date") %>%
+    mutate(
+      price = case_when(
+        currency == "USD" ~ price / usd_rate,
+        currency == "GBP" ~ price / gbp_rate,
+        TRUE ~ price
+      ),
+      currency = "EUR"
+    ) %>%
+    select(
+      -usd_rate, 
+      -gbp_rate
+    ) %>%
+    write_csv(file_price)
+  
+  # convert dividends ----------------------------------------------------------
+  dividends %>%
+    left_join(data_fx, by = "date") %>%
+    mutate(
+      dividend = case_when(
+        currency == "USD" ~ dividend / usd_rate,
+        currency == "GBP" ~ dividend / gbp_rate,
+        TRUE ~ dividend
+      )
+    ) %>%
+    select(
+      -currency,
+      -usd_rate, 
+      -gbp_rate
+    ) %>%
+    write_csv(file_dividends)
+} 
 
-  # load files
-  overview <- read_tsv(file.path(dir_overview, str_c(.x, "_overview.tsv")))
-  price <- read_tsv(file.path(dir_price, str_c(.x, "_price.tsv")))
-  dividends <- read_tsv(file.path(dir_dividends, str_c(.x, "_dividends.tsv")))
+# load etfs ====================================================================
+ishares_url <- read_csv("ishares_url.csv")
+
+# run_downloads ================================================================
+walk(ishares_url$name, convert_ishares)
+
+# aggregate prices and dividends ===============================================
+ishares_data <- map_dfr(data_etf$name, ~{
   
-  # get metadata
-  name <- .x
-  isin <- overview$value[overview$parameter == "ISIN"]
+  # load files -----------------------------------------------------------------
+  overview <- read_csv(file.path(dir_overview, str_c(.x, "_overview.csv")))
+  price <- read_csv(file.path(dir_price, str_c(.x, "_price.csv")))
+  dividends <- read_csv(file.path(dir_dividends, str_c(.x, "_dividends.csv")))
   
-  # combine data
-  out <- tibble(name, isin) %>%
-    mutate(id = TRUE) %>%
-    left_join(mutate(price, id = TRUE), by = "id") %>%
-    select(-id)
+  # add isin -------------------------------------------------------------------
+  out <- price %>%
+    mutate(isin = overview$value[overview$parameter == "ISIN"])
   
-  # dividends
-  if(dim(dividends)[1] > 0) {
-    out <- out %>%
-      left_join(dividends, by = "date") %>%
-      mutate(dividend = coalesce(dividend * 0.725, 0)) %>%
-      mutate(dividend = cumsum(dividend))
-  } else {
-    out$dividend <- 0
-  }
-  
+  # add dividends --------------------------------------------------------------
   out <- out %>%
+    left_join(dividends, by = c("name", "date")) %>%
+    filter(!is.na(price)) %>%
+    arrange(desc(date)) %>%
+    mutate(dividend = coalesce(dividend * 0.725, 0)) %>%
+    mutate(dividend = cumsum(dividend)) %>%
     mutate(price = price + dividend) %>%
-    select(-dividend)
+    select(-dividend) %>%
+    filter(!is.na(date))
   
   return(out)
-}) %>% bind_rows() %>%
-  filter(!is.na(date))
-  
-# convert to Euro returns ----
-ishares_data <- ishares_data %>%
-  left_join(data_fx, by = "date") %>%
-  mutate(price = case_when(currency == "USD" ~ price / usd_rate,
-                           currency == "GBP" ~ price / gbp_rate,
-                           TRUE ~ price)) %>%
-  select(-currency, -usd_rate, -gbp_rate)
+})
 
 # trailing monthly returns ----
 dates <- tibble(date = seq(from = min(ishares_data$date), to = max(ishares_data$date), by = 1))
